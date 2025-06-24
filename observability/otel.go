@@ -90,3 +90,10 @@ func startTraceProvider(exporter *otlptrace.Exporter, serviceName string) (*trac
 
 	return provider, closeFn, nil
 }
+
+func ExtractTraceparent(ctx context.Context) string {
+	carrier := propagation.MapCarrier{}
+	otel.GetTextMapPropagator().Inject(ctx, carrier)
+
+	return carrier.Get("traceparent")
+}
