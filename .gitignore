@@ -1,0 +1,16 @@
+# VSCode settings
+.vscode
+
+# JetBrains IDE settings (PhpStorm, GoLand, etc.)
+.idea
+
+# macOS system file
+.DS_Store
+
+# Environment variables
+.env
+
+# Temporary files
+.tmp
+
+.gen
