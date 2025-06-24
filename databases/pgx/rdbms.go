@@ -2,7 +2,6 @@ package libpgx
 
 import (
 	"context"
-	"database/sql"
 
 	"github.com/Masterminds/squirrel"
 	"github.com/SyaibanAhmadRamadhan/go-foundation-kit/utils/primitive"
@@ -42,6 +41,6 @@ type queryExecutor interface {
 }
 
 type Tx interface {
-	DoTx(ctx context.Context, opt *sql.TxOptions, fn func(tx RDBMS) error) error
-	DoTxContext(ctx context.Context, opt *sql.TxOptions, fn func(ctx context.Context, tx RDBMS) error) error
+	DoTx(ctx context.Context, opt pgx.TxOptions, fn func(tx RDBMS) error) error
+	DoTxContext(ctx context.Context, opt pgx.TxOptions, fn func(ctx context.Context, tx RDBMS) (err error)) (err error)
 }
