@@ -2,86 +2,87 @@ package observability
 
 import (
 	"context"
-	"encoding/json"
-	"fmt"
 	"io"
-
-	stdlog "log"
+	"log/slog"
+	"os"
+	"strings"
 
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
-	"github.com/segmentio/kafka-go"
 	"go.opentelemetry.io/otel/trace"
 )
 
-func NewLog(hook io.Writer, env, serviceName string) {
-	zerolog.TimeFieldFormat = zerolog.TimeFormatUnix
-	logger := zerolog.New(hook).With().
-		Str("env", env).
-		Str("service_name", serviceName).
-		Timestamp().Logger()
-	log.Logger = logger
+type LogConfig struct {
+	Hook        io.Writer // e.g., Kafka writer
+	Mode        string    // "text" or "json" (for slog)
+	Level       string    // "info", "debug", etc.
+	Env         string    // "production", "staging", etc.
+	ServiceName string
 }
 
-type KafkaHook struct {
-	writer      *kafka.Writer
-	topic       string
-	env         string
-	serviceName string
+func NewLog(cfg LogConfig) {
+
+	slogLevel := parseLevel(cfg.Level)
+	slogHandler := buildSlogHandler(cfg.Mode, slogLevel)
+
+	slog.SetDefault(slog.New(slogHandler))
+	slog.Info("slog initialized",
+		slog.String("env", cfg.Env),
+		slog.String("service", cfg.ServiceName),
+		slog.String("mode", cfg.Mode),
+		slog.String("level", cfg.Level),
+	)
+
+	if cfg.Hook == nil {
+		zerolog.TimeFieldFormat = zerolog.TimeFormatUnix
+		zerologLevel := parseZerologLevel(cfg.Level)
+
+		zlogger := zerolog.New(cfg.Hook).Level(zerologLevel).With().
+			Timestamp().
+			Str("env", cfg.Env).
+			Str("service_name", cfg.ServiceName).
+			Logger()
+
+		log.Logger = zlogger
+	}
 }
 
-func (w *KafkaHook) Write(p []byte) (n int, err error) {
-	if w.env != "production" {
-		stdlog.Printf("%s", string(p))
+func buildSlogHandler(mode string, level slog.Level) slog.Handler {
+	opts := &slog.HandlerOptions{Level: level}
+	switch strings.ToLower(mode) {
+	case "json":
+		return slog.NewJSONHandler(os.Stdout, opts)
+	default:
+		return slog.NewTextHandler(os.Stdout, opts)
 	}
+}
 
-	var payload map[string]any
-	if err := json.Unmarshal(p, &payload); err != nil {
-		stdlog.Printf("KafkaLogWriter: Failed to parse log JSON: %v", err)
-		return len(p), nil
+func parseLevel(level string) slog.Level {
+	switch strings.ToLower(level) {
+	case "debug":
+		return slog.LevelDebug
+	case "warn":
+		return slog.LevelWarn
+	case "error":
+		return slog.LevelError
+	default:
+		return slog.LevelInfo
 	}
+}
 
-	level := payload["level"]
-	statusCode := payload["status_code"]
-	spanID := payload["span_id"]
-	traceID := payload["trace_id"]
-	headers := []kafka.Header{
-		{Key: "service_name", Value: []byte(w.serviceName)},
-		{Key: "env", Value: []byte(w.env)},
-		{Key: "level", Value: fmt.Appendf(nil, "%v", level)},
+func parseZerologLevel(level string) zerolog.Level {
+	switch strings.ToLower(level) {
+	case "debug":
+		return zerolog.DebugLevel
+	case "warn":
+		return zerolog.WarnLevel
+	case "error":
+		return zerolog.ErrorLevel
+	case "fatal":
+		return zerolog.FatalLevel
+	default:
+		return zerolog.InfoLevel
 	}
-
-	if statusCode != nil {
-		headers = append(headers, kafka.Header{
-			Key: "status_code", Value: fmt.Appendf(nil, "%v", statusCode),
-		})
-	}
-	if spanID != nil {
-		headers = append(headers, kafka.Header{
-			Key: "span_id", Value: fmt.Appendf(nil, "%v", spanID),
-		})
-	}
-	if traceID != nil {
-		headers = append(headers, kafka.Header{
-			Key: "trace_id", Value: fmt.Appendf(nil, "%v", traceID),
-		})
-	}
-
-	if traceID == nil {
-		stdlog.Printf("warn: invalid log, must be need trace_id")
-		return
-	}
-
-	err = w.writer.WriteMessages(context.Background(), kafka.Message{
-		Value:   p,
-		Headers: headers,
-		Key:     fmt.Appendf(nil, "%v", traceID),
-	})
-	if err != nil {
-		stdlog.Printf("KafkaLogWriter: Failed to send log to Kafka: %v", err)
-	}
-
-	return len(p), nil
 }
 
 func Start(ctx context.Context, level zerolog.Level) *zerolog.Event {
