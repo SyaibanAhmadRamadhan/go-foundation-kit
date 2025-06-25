@@ -35,15 +35,18 @@ func NewPgxPoolWithOtel(connString string) (*pgxpool.Pool, error) {
 type rdbms struct {
 	db *pgxpool.Pool
 	queryExecutor
-	isTx bool
+	isTx    bool
+	traceTx TraceTx
 }
 
 var _ RDBMS = (*rdbms)(nil)
+var _ Tx = (*rdbms)(nil)
 
-func NewRDBMS(db *pgxpool.Pool) *rdbms {
+func NewRDBMS(db *pgxpool.Pool, traceTx TraceTx) *rdbms {
 	return &rdbms{
 		db:            db,
 		queryExecutor: db,
+		traceTx:       traceTx,
 	}
 }
 
@@ -121,6 +124,7 @@ func (s *rdbms) injectTx(tx pgx.Tx) *rdbms {
 	newRdbms := *s
 	newRdbms.queryExecutor = tx
 	newRdbms.isTx = true
+	newRdbms.traceTx = s.traceTx
 	return &newRdbms
 }
 
@@ -160,7 +164,11 @@ func (s *rdbms) DoTx(ctx context.Context, opt pgx.TxOptions, fn func(tx RDBMS) (
 	return
 }
 
-func (s *rdbms) DoTxContext(ctx context.Context, opt pgx.TxOptions, fn func(ctx context.Context, tx RDBMS) (err error)) (err error) {
+func (s *rdbms) DoTxContext(
+	ctx context.Context,
+	opt pgx.TxOptions,
+	fn func(ctx context.Context, tx RDBMS) (err error),
+) (err error) {
 	if opt.IsoLevel == "" {
 		opt = pgx.TxOptions{
 			IsoLevel:   pgx.ReadCommitted,
@@ -168,25 +176,40 @@ func (s *rdbms) DoTxContext(ctx context.Context, opt pgx.TxOptions, fn func(ctx 
 		}
 	}
 
+	if s.traceTx != nil {
+		ctx = s.traceTx.TracerBeginTxStart(ctx, opt)
+	}
+
 	tx, err := s.db.BeginTx(ctx, opt)
 	if err != nil {
+		s.traceTx.TracerBeginTxEnd(ctx, err, "begin")
 		return err
 	}
 
 	defer func() {
-		if p := recover(); p != nil {
+		switch {
+		case recover() != nil:
 			_ = tx.Rollback(ctx)
-			panic(p)
-		} else if err != nil {
-			if errRollback := tx.Rollback(ctx); errRollback != nil {
-				if !errors.Is(err, sql.ErrTxDone) {
-					err = errors.Join(err, errRollback)
-				}
+			if s.traceTx != nil {
+				s.traceTx.TracerBeginTxEnd(ctx, errors.New("panic occurred"), "rollback")
 			}
-		} else {
-			if errCommit := tx.Commit(ctx); errCommit != nil {
-				if !errors.Is(err, sql.ErrTxDone) {
-					err = errors.Join(err, errCommit)
+			panic("panic occurred")
+		case err != nil:
+			if errRollback := tx.Rollback(ctx); errRollback != nil && !errors.Is(err, sql.ErrTxDone) {
+				err = errors.Join(err, errRollback)
+			}
+			if s.traceTx != nil {
+				s.traceTx.TracerBeginTxEnd(ctx, err, "rollback")
+			}
+		default:
+			if errCommit := tx.Commit(ctx); errCommit != nil && !errors.Is(errCommit, sql.ErrTxDone) {
+				err = errors.Join(err, errCommit)
+				if s.traceTx != nil {
+					s.traceTx.TracerBeginTxEnd(ctx, errCommit, "commit")
+				}
+			} else {
+				if s.traceTx != nil {
+					s.traceTx.TracerBeginTxEnd(ctx, nil, "commit")
 				}
 			}
 		}

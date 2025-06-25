@@ -44,3 +44,8 @@ type Tx interface {
 	DoTx(ctx context.Context, opt pgx.TxOptions, fn func(tx RDBMS) error) error
 	DoTxContext(ctx context.Context, opt pgx.TxOptions, fn func(ctx context.Context, tx RDBMS) (err error)) (err error)
 }
+
+type TraceTx interface {
+	TracerBeginTxStart(ctx context.Context, opt pgx.TxOptions) context.Context
+	TracerBeginTxEnd(ctx context.Context, err error, action string)
+}

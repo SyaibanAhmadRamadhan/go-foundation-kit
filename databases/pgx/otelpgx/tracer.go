@@ -1,3 +1,10 @@
+// Package otelpgx provides OpenTelemetry instrumentation for pgx and pgxpool.
+//
+// This implementation is inspired by the exaring/otelpgx open-source library:
+// https://github.com/exaring/otelpgx
+//
+// It includes tracing (OpenTelemetry Tracer) and optional metrics (OpenTelemetry Meter),
+// capturing transaction spans, query attributes, errors, and contextual timing.
 package otelpgx
 
 import (
@@ -20,8 +27,8 @@ import (
 )
 
 const (
-	tracerName          = "github.com/exaring/otelpgx"
-	meterName           = "github.com/exaring/otelpgx"
+	tracerName          = "github.com/SyaibanAhmadRamadhan/go-foundation-kit/databases/pgx/otelpgx"
+	meterName           = "github.com/SyaibanAhmadRamadhan/go-foundation-kit/databases/pgx/otelpgx"
 	startTimeCtxKey     = "otelpgxStartTime"
 	sqlOperationUnknown = "UNKNOWN"
 )
@@ -33,6 +40,7 @@ const (
 	pgxOperationConnect = "connect"
 	pgxOperationPrepare = "prepare"
 	pgxOperationAcquire = "acquire"
+	pgxOperationBegin   = "begin"
 )
 
 const (
@@ -501,6 +509,38 @@ func (t *Tracer) TraceAcquireStart(ctx context.Context, pool *pgxpool.Pool, data
 	ctx, _ = t.tracer.Start(ctx, "pool.acquire", opts...)
 
 	return ctx
+}
+
+func (t *Tracer) TracerBeginTxStart(ctx context.Context, opt pgx.TxOptions) context.Context {
+	ctx = context.WithValue(ctx, startTimeCtxKey, time.Now())
+
+	// Selalu buat span baru
+	ctx, _ = t.tracer.Start(ctx, "db.tx.begin", trace.WithAttributes(
+		attribute.String("db.transaction.iso_level", string(opt.IsoLevel)),
+		attribute.String("db.transaction.access_mode", string(opt.AccessMode)),
+		attribute.String("db.transaction.deferrable_mode", string(opt.DeferrableMode)),
+	))
+
+	// Simpan span dalam context
+	return ctx
+}
+
+func (t *Tracer) TracerBeginTxEnd(ctx context.Context, err error, action string) {
+	span := trace.SpanFromContext(ctx)
+	if !span.IsRecording() {
+		return
+	}
+
+	recordSpanError(span, err)
+	t.incrementOperationErrorCount(ctx, err, pgxOperationBegin)
+
+	span.SetAttributes(
+		attribute.String("db.transaction.status", action),
+	)
+
+	t.recordOperationDuration(ctx, pgxOperationBegin)
+
+	span.End()
 }
 
 // TraceAcquireEnd is called when a connection has been acquired.
