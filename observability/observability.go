@@ -16,7 +16,7 @@ type OptionParams struct {
 	OtlpPassword string
 }
 
-func NewObservabilityUsingKafka(params OptionParams) (trace.Tracer, func(), error) {
+func NewObservabilityOtel(params OptionParams) (trace.Tracer, func(), error) {
 	closeFunc, err := NewOtel(params.ServiceName, params.OtlpEndpoint, params.OtlpUsername, params.OtlpPassword)
 	if err != nil {
 		return nil, nil, err
