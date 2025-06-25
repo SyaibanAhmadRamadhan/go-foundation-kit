@@ -54,7 +54,7 @@ func ErrorResponse(c *gin.Context, err error) {
 	}
 
 	c.Error(err)
-	c.JSON(http.StatusUnprocessableEntity, map[string]string{
+	c.JSON(httpCode, map[string]string{
 		"message": msg,
 	})
 }

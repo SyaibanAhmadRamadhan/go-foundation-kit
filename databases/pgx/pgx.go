@@ -35,18 +35,16 @@ func NewPgxPoolWithOtel(connString string) (*pgxpool.Pool, error) {
 type rdbms struct {
 	db *pgxpool.Pool
 	queryExecutor
-	isTx    bool
-	traceTx TraceTx
+	isTx bool
 }
 
 var _ RDBMS = (*rdbms)(nil)
 var _ Tx = (*rdbms)(nil)
 
-func NewRDBMS(db *pgxpool.Pool, traceTx TraceTx) *rdbms {
+func NewRDBMS(db *pgxpool.Pool) *rdbms {
 	return &rdbms{
 		db:            db,
 		queryExecutor: db,
-		traceTx:       traceTx,
 	}
 }
 
@@ -124,7 +122,6 @@ func (s *rdbms) injectTx(tx pgx.Tx) *rdbms {
 	newRdbms := *s
 	newRdbms.queryExecutor = tx
 	newRdbms.isTx = true
-	newRdbms.traceTx = s.traceTx
 	return &newRdbms
 }
 
@@ -176,13 +173,8 @@ func (s *rdbms) DoTxContext(
 		}
 	}
 
-	if s.traceTx != nil {
-		ctx = s.traceTx.TracerBeginTxStart(ctx, opt)
-	}
-
 	tx, err := s.db.BeginTx(ctx, opt)
 	if err != nil {
-		s.traceTx.TracerBeginTxEnd(ctx, err, "begin")
 		return err
 	}
 
@@ -190,27 +182,14 @@ func (s *rdbms) DoTxContext(
 		switch {
 		case recover() != nil:
 			_ = tx.Rollback(ctx)
-			if s.traceTx != nil {
-				s.traceTx.TracerBeginTxEnd(ctx, errors.New("panic occurred"), "rollback")
-			}
 			panic("panic occurred")
 		case err != nil:
 			if errRollback := tx.Rollback(ctx); errRollback != nil && !errors.Is(err, sql.ErrTxDone) {
 				err = errors.Join(err, errRollback)
 			}
-			if s.traceTx != nil {
-				s.traceTx.TracerBeginTxEnd(ctx, err, "rollback")
-			}
 		default:
 			if errCommit := tx.Commit(ctx); errCommit != nil && !errors.Is(errCommit, sql.ErrTxDone) {
 				err = errors.Join(err, errCommit)
-				if s.traceTx != nil {
-					s.traceTx.TracerBeginTxEnd(ctx, errCommit, "commit")
-				}
-			} else {
-				if s.traceTx != nil {
-					s.traceTx.TracerBeginTxEnd(ctx, nil, "commit")
-				}
 			}
 		}
 	}()
