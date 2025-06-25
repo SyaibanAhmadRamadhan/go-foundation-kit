@@ -76,7 +76,6 @@ func (w *KafkaHook) Write(p []byte) (n int, err error) {
 		Value:   p,
 		Headers: headers,
 		Key:     fmt.Appendf(nil, "%v", traceID),
-		Topic:   w.topic,
 	})
 	if err != nil {
 		stdlog.Printf("KafkaLogWriter: Failed to send log to Kafka: %v", err)

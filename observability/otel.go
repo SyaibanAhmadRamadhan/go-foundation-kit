@@ -74,7 +74,7 @@ func startTraceProvider(exporter *otlptrace.Exporter, serviceName string) (*trac
 	)
 
 	closeFn := func() {
-		ctxClosure, cancelClosure := context.WithTimeout(ctx, 5*time.Second)
+		ctxClosure, cancelClosure := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancelClosure()
 
 		if err := exporter.Shutdown(ctxClosure); err != nil {
