@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
-	"log"
+	"log/slog"
 	"time"
 
 	"go.opentelemetry.io/otel"
@@ -44,7 +44,9 @@ func NewOtel(serviceName, otlpEndpoint, otlpUsername, otlpPassword string) (func
 
 	otel.SetTextMapPropagator(propagation.NewCompositeTextMapPropagator(propagation.TraceContext{}, propagation.Baggage{}))
 	otel.SetTracerProvider(traceProvider)
-	log.Printf("info: initialization opentelemetry successfully")
+	slog.Info("OpenTelemetry tracer provider initialized",
+		slog.String("service", serviceName),
+	)
 	return closeFunc, nil
 }
 
@@ -61,12 +63,14 @@ func startTraceProvider(exporter *otlptrace.Exporter, serviceName string) (*trac
 		resource.WithFromEnv(),
 	)
 	if err != nil {
-		err = fmt.Errorf("failed to created resource: %w", err)
-		return nil, nil, err
+		slog.Error("failed to create OpenTelemetry resource",
+			slog.String("service", serviceName),
+			slog.Any("error", err),
+		)
+		return nil, nil, fmt.Errorf("failed to create OpenTelemetry resource: %w", err)
 	}
 
 	bsp := trace.NewBatchSpanProcessor(exporter)
-
 	provider := trace.NewTracerProvider(
 		trace.WithSpanProcessor(bsp),
 		trace.WithResource(res),
@@ -77,15 +81,19 @@ func startTraceProvider(exporter *otlptrace.Exporter, serviceName string) (*trac
 		ctxClosure, cancelClosure := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancelClosure()
 
+		slog.Info("shutting down OpenTelemetry components...")
+
 		if err := exporter.Shutdown(ctxClosure); err != nil {
-			log.Printf("error: failed to shutdown exporter: %v", err)
+			slog.Error("failed to shutdown OpenTelemetry exporter", slog.Any("error", err))
+		} else {
+			slog.Info("OpenTelemetry exporter shutdown complete")
 		}
 
 		if err := provider.Shutdown(ctxClosure); err != nil {
-			log.Printf("error: failed to shutdown provider: %v", err)
+			slog.Error("failed to shutdown tracer provider", slog.Any("error", err))
+		} else {
+			slog.Info("OpenTelemetry tracer provider shutdown complete")
 		}
-
-		log.Printf("info: shutdown export and provider successfully")
 	}
 
 	return provider, closeFn, nil

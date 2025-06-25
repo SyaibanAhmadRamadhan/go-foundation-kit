@@ -12,8 +12,25 @@ type Reader struct {
 	subTracer    TracerSub
 	commitTracer TracerCommitMessage
 	groupID      string
-	marshal      MarshalFunc
 	unmarshal    UnmarshalFunc
+}
+
+func (r *Reader) traceAndUnmarshal(ctx context.Context, msg kafka.Message, v any) (context.Context, error) {
+	var ctxOtel context.Context
+	var err error
+	if r.subTracer != nil {
+		ctxOtel = r.subTracer.TraceSubStart(ctx, r.groupID, &msg)
+	}
+	if v != nil {
+		err = r.unmarshal(msg.Value, v)
+		if err != nil {
+			err = errors.Join(err, ErrJsonUnmarshal)
+		}
+	}
+	if r.subTracer != nil {
+		r.subTracer.TraceSubEnd(ctxOtel, err)
+	}
+	return ctxOtel, err
 }
 
 func (r *Reader) FetchMessage(ctx context.Context, v any) (kafka.Message, error) {
@@ -21,22 +38,7 @@ func (r *Reader) FetchMessage(ctx context.Context, v any) (kafka.Message, error)
 	if err != nil {
 		return kafka.Message{}, err
 	}
-	var ctxOtel context.Context
-	if r.subTracer != nil {
-		ctxOtel = r.subTracer.TraceSubStart(ctx, r.groupID, &msg)
-	}
-
-	if v != nil {
-		err = r.unmarshal(msg.Value, v)
-		if err != nil {
-			err = errors.Join(err, ErrJsonUnmarshal)
-		}
-	}
-
-	if r.subTracer != nil {
-		r.subTracer.TraceSubEnd(ctxOtel, err)
-	}
-
+	_, err = r.traceAndUnmarshal(ctx, msg, v)
 	return msg, err
 }
 
@@ -46,27 +48,13 @@ func (r *Reader) ReadMessage(ctx context.Context, v any) (kafka.Message, error) 
 		return kafka.Message{}, err
 	}
 
-	var ctxOtel context.Context
+	_, err = r.traceAndUnmarshal(ctx, msg, v)
 
-	if r.subTracer != nil {
-		ctxOtel = r.subTracer.TraceSubStart(ctx, r.groupID, &msg)
-	}
-
-	if v != nil {
-		err = r.unmarshal(msg.Value, v)
-		if err != nil {
-			err = errors.Join(err, ErrJsonUnmarshal)
-		}
-	}
-
-	if r.subTracer != nil {
-		r.subTracer.TraceSubEnd(ctxOtel, err)
-	}
 	return msg, err
 }
 
 func (r *Reader) CommitMessages(ctx context.Context, messages ...kafka.Message) error {
-	if messages == nil || len(messages) <= 0 {
+	if len(messages) <= 0 {
 		return nil
 	}
 
@@ -81,4 +69,8 @@ func (r *Reader) CommitMessages(ctx context.Context, messages ...kafka.Message) 
 	}
 
 	return err
+}
+
+func (r *Reader) Close() error {
+	return r.R.Close()
 }

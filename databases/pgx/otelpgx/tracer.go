@@ -511,37 +511,37 @@ func (t *Tracer) TraceAcquireStart(ctx context.Context, pool *pgxpool.Pool, data
 	return ctx
 }
 
-func (t *Tracer) TracerBeginTxStart(ctx context.Context, opt pgx.TxOptions) context.Context {
-	ctx = context.WithValue(ctx, startTimeCtxKey, time.Now())
+// func (t *Tracer) TracerBeginTxStart(ctx context.Context, opt pgx.TxOptions) context.Context {
+// 	ctx = context.WithValue(ctx, startTimeCtxKey, time.Now())
 
-	// Selalu buat span baru
-	ctx, _ = t.tracer.Start(ctx, "db.tx.begin", trace.WithAttributes(
-		attribute.String("db.transaction.iso_level", string(opt.IsoLevel)),
-		attribute.String("db.transaction.access_mode", string(opt.AccessMode)),
-		attribute.String("db.transaction.deferrable_mode", string(opt.DeferrableMode)),
-	))
+// 	// Selalu buat span baru
+// 	ctx, _ = t.tracer.Start(ctx, "db.tx.begin", trace.WithAttributes(
+// 		attribute.String("db.transaction.iso_level", string(opt.IsoLevel)),
+// 		attribute.String("db.transaction.access_mode", string(opt.AccessMode)),
+// 		attribute.String("db.transaction.deferrable_mode", string(opt.DeferrableMode)),
+// 	))
 
-	// Simpan span dalam context
-	return ctx
-}
+// 	// Simpan span dalam context
+// 	return ctx
+// }
 
-func (t *Tracer) TracerBeginTxEnd(ctx context.Context, err error, action string) {
-	span := trace.SpanFromContext(ctx)
-	if !span.IsRecording() {
-		return
-	}
+// func (t *Tracer) TracerBeginTxEnd(ctx context.Context, err error, action string) {
+// 	span := trace.SpanFromContext(ctx)
+// 	if !span.IsRecording() {
+// 		return
+// 	}
 
-	recordSpanError(span, err)
-	t.incrementOperationErrorCount(ctx, err, pgxOperationBegin)
+// 	recordSpanError(span, err)
+// 	t.incrementOperationErrorCount(ctx, err, pgxOperationBegin)
 
-	span.SetAttributes(
-		attribute.String("db.transaction.status", action),
-	)
+// 	span.SetAttributes(
+// 		attribute.String("db.transaction.status", action),
+// 	)
 
-	t.recordOperationDuration(ctx, pgxOperationBegin)
+// 	t.recordOperationDuration(ctx, pgxOperationBegin)
 
-	span.End()
-}
+// 	span.End()
+// }
 
 // TraceAcquireEnd is called when a connection has been acquired.
 func (t *Tracer) TraceAcquireEnd(ctx context.Context, _ *pgxpool.Pool, data pgxpool.TraceAcquireEndData) {

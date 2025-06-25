@@ -3,13 +3,15 @@ package libkafka
 import (
 	"context"
 	"errors"
+	"fmt"
+	"log/slog"
 	"runtime/debug"
+	"time"
 
 	"github.com/segmentio/kafka-go"
 )
 
 var ErrProcessShutdownIsRunning = errors.New("process shutdown is running")
-var errClosed = errors.New("kafka closed")
 var ErrJsonUnmarshal = errors.New("json unmarshal error")
 
 type broker struct {
@@ -17,59 +19,56 @@ type broker struct {
 	pubTracer    TracerPub
 	subTracer    TracerSub
 	commitTracer TracerCommitMessage
+	readers      []*Reader
 }
 
 func New(opts ...Options) *broker {
-	b := &broker{}
+	b := &broker{
+		readers: make([]*Reader, 0),
+	}
 	for _, option := range opts {
 		option(b)
 	}
 
+	ctxPing, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	PingKafkaWriter(ctxPing, b.kafkaWriter)
 	return b
 }
 
 func (b *broker) Close() {
-	b.kafkaWriter.Close()
-}
+	var closeErrs []error
 
-type MarshalFunc func(any) ([]byte, error)
-type UnmarshalFunc func([]byte, any) error
+	if b.kafkaWriter != nil {
+		if err := b.kafkaWriter.Close(); err != nil {
+			slog.Error("failed to close kafka writer", slog.Any("error", err))
+			closeErrs = append(closeErrs, fmt.Errorf("writer: %w", err))
+		} else {
+			slog.Info("kafka writer closed successfully")
+		}
+	}
 
-type PubInput struct {
-	Messages []kafka.Message
-}
+	for i, reader := range b.readers {
+		if reader == nil {
+			continue
+		}
+		if err := reader.Close(); err != nil {
+			slog.Error("failed to close kafka reader", slog.Int("index", i), slog.Any("error", err))
+			closeErrs = append(closeErrs, fmt.Errorf("reader[%d]: %w", i, err))
+		} else {
+			slog.Info("kafka reader closed successfully", slog.Int("index", i))
+		}
+	}
 
-type PubOutput struct{}
-
-type SubInput struct {
-	Config kafka.ReaderConfig
-
-	// by default using json
-	Unmarshal UnmarshalFunc
-}
-
-type SubOutput struct {
-	Reader Reader
-}
-
-type TracerPub interface {
-	TracePubStart(ctx context.Context, msg *kafka.Message) context.Context
-	TracePubEnd(ctx context.Context, input PubOutput, err error)
-}
-
-type TracerSub interface {
-	TraceSubStart(ctx context.Context, groupID string, msg *kafka.Message) context.Context
-	TraceSubEnd(ctx context.Context, err error)
-}
-
-type TracerCommitMessage interface {
-	TraceCommitMessagesStart(ctx context.Context, groupID string, messages ...kafka.Message) []context.Context
-	TraceCommitMessagesEnd(ctx []context.Context, err error)
-}
-
-type PubSub interface {
-	Publish(ctx context.Context, input PubInput) (output PubOutput, err error)
-	Subscribe(ctx context.Context, input SubInput) (output SubOutput, err error)
+	if len(closeErrs) > 0 {
+		slog.Warn("broker close completed with errors", slog.Int("error_count", len(closeErrs)))
+		for _, err := range closeErrs {
+			slog.Warn("close error", slog.Any("error", err))
+		}
+	} else {
+		slog.Info("broker closed cleanly without errors")
+	}
 }
 
 func findOwnImportedVersion() {
@@ -81,4 +80,34 @@ func findOwnImportedVersion() {
 			}
 		}
 	}
+}
+
+func PingKafkaBrokers(ctx context.Context, brokers []string, dialer *kafka.Dialer) error {
+	if len(brokers) == 0 {
+		return fmt.Errorf("no Kafka brokers provided")
+	}
+
+	for _, addr := range brokers {
+		conn, err := dialer.DialContext(ctx, "tcp", addr)
+		if err != nil {
+			return fmt.Errorf("failed to connect to Kafka broker %s: %w", addr, err)
+		}
+		_ = conn.Close()
+	}
+	return nil
+}
+
+func PingKafkaWriter(ctx context.Context, writer *kafka.Writer) error {
+	if writer == nil {
+		return nil
+	}
+
+	addr := writer.Addr.String()
+
+	conn, err := kafka.DialContext(ctx, "tcp", addr)
+	if err != nil {
+		return fmt.Errorf("failed to connect to Kafka writer broker %s: %w", addr, err)
+	}
+	_ = conn.Close()
+	return nil
 }

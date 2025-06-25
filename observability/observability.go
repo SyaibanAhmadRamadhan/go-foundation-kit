@@ -1,6 +1,7 @@
 package observability
 
 import (
+	"log/slog"
 	"time"
 
 	"github.com/segmentio/kafka-go"
@@ -27,10 +28,20 @@ func NewObservabilityOtel(params OptionParams) (trace.Tracer, func(), error) {
 	}, err
 }
 
-func NewLogWithKafkaHook(kafkaAddr []string, transportKafka *kafka.Transport, topic string, optionsParams OptionParams) func() {
+type LogWithKafkaHookOptions struct {
+	KafkaAddrs  []string
+	Transport   *kafka.Transport
+	Topic       string
+	Env         string
+	ServiceName string
+	LogMode     string // LogMode  "text" or "json"
+	LogLevel    string // "info", "debug", etc.
+}
+
+func NewLogWithKafkaHook(optionsParams LogWithKafkaHookOptions) func() {
 	w := &kafka.Writer{
-		Addr:            kafka.TCP(kafkaAddr...),
-		Topic:           topic,
+		Addr:            kafka.TCP(optionsParams.KafkaAddrs...),
+		Topic:           optionsParams.Topic,
 		Balancer:        &kafka.LeastBytes{},
 		MaxAttempts:     5,
 		WriteBackoffMin: time.Duration(100),
@@ -41,16 +52,37 @@ func NewLogWithKafkaHook(kafkaAddr []string, transportKafka *kafka.Transport, to
 		BatchTimeout: time.Duration(3 * time.Second),
 
 		RequiredAcks: kafka.RequireOne,
-		Transport:    transportKafka,
+		Transport:    optionsParams.Transport,
 	}
-	NewLog(&KafkaHook{
-		writer:      w,
-		topic:       topic,
-		env:         optionsParams.Env,
-		serviceName: optionsParams.ServiceName,
-	}, optionsParams.Env, optionsParams.ServiceName)
+	NewLog(LogConfig{
+		Hook: &KafkaHook{
+			writer:      w,
+			topic:       optionsParams.Topic,
+			env:         optionsParams.Env,
+			serviceName: optionsParams.ServiceName,
+		},
+		Mode:        optionsParams.LogMode,
+		Level:       optionsParams.LogLevel,
+		Env:         optionsParams.Env,
+		ServiceName: optionsParams.ServiceName,
+	})
 
 	return func() {
-		w.Close()
+		slog.Info("shutting down kafka writer...",
+			slog.String("topic", optionsParams.Topic),
+			slog.String("env", optionsParams.Env),
+			slog.String("service", optionsParams.ServiceName),
+		)
+
+		if err := w.Close(); err != nil {
+			slog.Error("failed to close kafka writer",
+				slog.String("topic", optionsParams.Topic),
+				slog.Any("error", err),
+			)
+		} else {
+			slog.Info("kafka writer closed successfully",
+				slog.String("topic", optionsParams.Topic),
+			)
+		}
 	}
 }

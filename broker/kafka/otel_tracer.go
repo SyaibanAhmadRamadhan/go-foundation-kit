@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
-	"sync"
 
 	"github.com/segmentio/kafka-go"
 	"go.opentelemetry.io/otel"
@@ -33,7 +32,6 @@ type opentelemetry struct {
 	// When ack multiple, we need to end spans of every delivery before the tag,
 	// so we keep a map of every span that haven't ended.
 	spanMap map[uint64]trace.Span
-	m       sync.Mutex
 }
 
 func NewOtel() *opentelemetry {

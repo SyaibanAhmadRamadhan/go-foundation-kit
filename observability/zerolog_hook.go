@@ -1,0 +1,89 @@
+package observability
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"log/slog"
+
+	"github.com/segmentio/kafka-go"
+)
+
+type KafkaHook struct {
+	writer      *kafka.Writer
+	topic       string
+	env         string
+	serviceName string
+}
+
+func (w *KafkaHook) Write(p []byte) (n int, err error) {
+	if w.env != "production" {
+		slog.Info("log output (non-production)",
+			slog.String("service", w.serviceName),
+			slog.String("env", w.env),
+			slog.String("log", string(p)),
+		)
+	}
+
+	var payload map[string]any
+	if err := json.Unmarshal(p, &payload); err != nil {
+		slog.Error("KafkaLogWriter: failed to parse log JSON",
+			slog.String("service", w.serviceName),
+			slog.String("env", w.env),
+			slog.Any("error", err),
+			slog.String("raw", string(p)),
+		)
+		return len(p), nil
+	}
+
+	level := payload["level"]
+	statusCode := payload["status_code"]
+	spanID := payload["span_id"]
+	traceID := payload["trace_id"]
+	headers := []kafka.Header{
+		{Key: "service_name", Value: []byte(w.serviceName)},
+		{Key: "env", Value: []byte(w.env)},
+		{Key: "level", Value: fmt.Appendf(nil, "%v", level)},
+	}
+
+	if statusCode != nil {
+		headers = append(headers, kafka.Header{
+			Key: "status_code", Value: fmt.Appendf(nil, "%v", statusCode),
+		})
+	}
+	if spanID != nil {
+		headers = append(headers, kafka.Header{
+			Key: "span_id", Value: fmt.Appendf(nil, "%v", spanID),
+		})
+	}
+	if traceID != nil {
+		headers = append(headers, kafka.Header{
+			Key: "trace_id", Value: fmt.Appendf(nil, "%v", traceID),
+		})
+	}
+
+	if traceID == nil {
+		slog.Warn("KafkaLogWriter: log entry missing trace_id",
+			slog.String("service", w.serviceName),
+			slog.String("env", w.env),
+			slog.Any("payload", payload),
+		)
+		return
+	}
+
+	err = w.writer.WriteMessages(context.Background(), kafka.Message{
+		Value:   p,
+		Headers: headers,
+		Key:     fmt.Appendf(nil, "%v", traceID),
+	})
+	if err != nil {
+		slog.Error("KafkaLogWriter: failed to send log to Kafka",
+			slog.String("service", w.serviceName),
+			slog.String("env", w.env),
+			slog.Any("error", err),
+			slog.String("trace_id", fmt.Sprintf("%v", traceID)),
+		)
+	}
+
+	return len(p), nil
+}
