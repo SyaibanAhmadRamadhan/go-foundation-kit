@@ -6,55 +6,80 @@ import (
 	"github.com/SyaibanAhmadRamadhan/go-foundation-kit/security/hash"
 )
 
-func TestHashPasswordAndVerifyPassword(t *testing.T) {
+func TestHasher_HashAndVerify(t *testing.T) {
+	hasher := hash.NewHasherArgon2ID(hash.DefaultConfigArgon2ID)
 	password := "supersecret123"
 
-	hashPassword, err := hash.HashPassword(password)
-	if err != nil {
-		t.Fatalf("HashPassword failed: %v", err)
-	}
-
-	ok, err := hash.VerifyPassword(hashPassword, password)
-	if err != nil {
-		t.Fatalf("VerifyPassword failed: %v", err)
-	}
-	if !ok {
-		t.Error("expected password to match hash, but it did not")
-	}
-
-	ok, err = hash.VerifyPassword(hashPassword, "wrongpassword")
-	if err != nil {
-		t.Fatalf("VerifyPassword failed (negative): %v", err)
-	}
-	if ok {
-		t.Error("expected password not to match hash, but it did")
-	}
-}
-
-func BenchmarkHashPassword(b *testing.B) {
-	password := "benchmarkpassword"
-	for b.Loop() {
-		_, err := hash.HashPassword(password)
+	t.Run("success verify", func(t *testing.T) {
+		hashPassword, err := hasher.Hash(password)
 		if err != nil {
-			b.Fatalf("HashPassword failed: %v", err)
+			t.Fatalf("Hash() failed: %v", err)
 		}
-	}
-}
 
-func BenchmarkVerifyPassword(b *testing.B) {
-	password := "benchmarkpassword"
-	hashPassword, err := hash.HashPassword(password)
-	if err != nil {
-		b.Fatalf("setup HashPassword failed: %v", err)
-	}
-
-	for b.Loop() {
-		ok, err := hash.VerifyPassword(hashPassword, password)
+		ok, err := hasher.Verify(hashPassword, password)
 		if err != nil {
-			b.Fatalf("VerifyPassword failed: %v", err)
+			t.Fatalf("Verify() failed: %v", err)
 		}
 		if !ok {
-			b.Fatal("VerifyPassword returned false")
+			t.Error("expected password to match hash, but it did not")
+		}
+	})
+
+	t.Run("failed verify", func(t *testing.T) {
+		hashPassword, err := hasher.Hash(password)
+		if err != nil {
+			t.Fatalf("Hash() failed: %v", err)
+		}
+
+		ok, err := hasher.Verify(hashPassword, "wrongpassword")
+		if err != nil {
+			t.Fatalf("Verify() failed (negative): %v", err)
+		}
+		if ok {
+			t.Error("expected password not to match hash, but it did")
+		}
+	})
+
+	t.Run("invalid hash format", func(t *testing.T) {
+		_, err := hasher.Verify("invalid$format$only$3$parts", password)
+		if err == nil {
+			t.Error("expected error on invalid hash format, but got nil")
+		}
+	})
+}
+
+func BenchmarkHasher_Hash(b *testing.B) {
+	hasher := hash.NewHasherArgon2ID(hash.DefaultConfigArgon2ID)
+	password := "benchmarkpassword"
+
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		_, err := hasher.Hash(password)
+		if err != nil {
+			b.Fatalf("Hash failed: %v", err)
+		}
+	}
+}
+
+func BenchmarkHasher_Verify(b *testing.B) {
+	hasher := hash.NewHasherArgon2ID(hash.DefaultConfigArgon2ID)
+	password := "benchmarkpassword"
+
+	hashPassword, err := hasher.Hash(password)
+	if err != nil {
+		b.Fatalf("setup Hash failed: %v", err)
+	}
+
+	b.ReportAllocs()
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		ok, err := hasher.Verify(hashPassword, password)
+		if err != nil {
+			b.Fatalf("Verify failed: %v", err)
+		}
+		if !ok {
+			b.Fatal("Verify returned false")
 		}
 	}
 }

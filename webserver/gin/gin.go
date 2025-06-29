@@ -11,7 +11,6 @@ type ginValidatorCustom struct {
 	validator *validator.Validate
 }
 
-// ValidateStruct is called by Gin to validate the struct
 func (cv *ginValidatorCustom) ValidateStruct(obj any) error {
 	if err := cv.validator.Struct(obj); err != nil {
 		return err
@@ -19,19 +18,22 @@ func (cv *ginValidatorCustom) ValidateStruct(obj any) error {
 	return nil
 }
 
-// Engine is called by Gin to retrieve the underlying validation engine
 func (cv *ginValidatorCustom) Engine() any {
 	return cv.validator
 }
 
+// GinConfig contains configuration for setting up a new Gin engine with
+// OpenTelemetry middleware, custom validator, logging, CORS, etc.
 type GinConfig struct {
-	BlacklistRouteLogResponse map[string]struct{}
-	SensitiveFields           map[string]struct{}
-	Validator                 *validator.Validate
-	CorsConf                  CorsConfig
-	AppName                   string
+	BlacklistRouteLogResponse map[string]struct{} // Routes that should not log response body
+	SensitiveFields           map[string]struct{} // Fields that should be redacted from logs
+	Validator                 *validator.Validate // Validator instance for request validation
+	CorsConf                  CorsConfig          // CORS configuration
+	AppName                   string              // Application name for OpenTelemetry tracing
 }
 
+// NewGin creates and returns a configured *gin.Engine instance.
+// It sets up recovery, CORS, OpenTelemetry tracing, logging, and validation.
 func NewGin(conf GinConfig) *gin.Engine {
 	router := gin.Default()
 
@@ -39,9 +41,11 @@ func NewGin(conf GinConfig) *gin.Engine {
 		validator: conf.Validator,
 	}
 	binding.Validator = ginValidator
+
 	router.Use(gin.Recovery())
 	router.Use(cors(conf.CorsConf))
 	router.Use(otelgin.Middleware(conf.AppName))
 	router.Use(trace(conf.BlacklistRouteLogResponse, conf.SensitiveFields))
+
 	return router
 }

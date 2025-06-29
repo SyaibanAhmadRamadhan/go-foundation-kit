@@ -11,9 +11,13 @@ import (
 	"github.com/segmentio/kafka-go"
 )
 
+// ErrProcessShutdownIsRunning is returned when a process shutdown is already in progress.
 var ErrProcessShutdownIsRunning = errors.New("process shutdown is running")
+
+// ErrJsonUnmarshal is returned when JSON unmarshalling fails.
 var ErrJsonUnmarshal = errors.New("json unmarshal error")
 
+// broker manages Kafka readers and writers, along with optional tracing integrations.
 type broker struct {
 	kafkaWriter  *kafka.Writer
 	pubTracer    TracerPub
@@ -22,6 +26,14 @@ type broker struct {
 	readers      []*Reader
 }
 
+// New creates a new broker instance with optional configurations applied via functional options.
+// It also attempts to ping the Kafka writer during initialization.
+//
+// Parameters:
+//   - opts: variadic list of Options to configure the broker
+//
+// Returns:
+//   - *broker: initialized broker instance
 func New(opts ...Options) *broker {
 	b := &broker{
 		readers: make([]*Reader, 0),
@@ -37,6 +49,8 @@ func New(opts ...Options) *broker {
 	return b
 }
 
+// Close closes the Kafka writer and all registered readers.
+// Logs any errors encountered during the closing process.
 func (b *broker) Close() {
 	var closeErrs []error
 
@@ -71,6 +85,8 @@ func (b *broker) Close() {
 	}
 }
 
+// findOwnImportedVersion reads the build info to detect and store the imported version of the Tracer library.
+// This is useful for debugging or version diagnostics in observability systems.
 func findOwnImportedVersion() {
 	buildInfo, ok := debug.ReadBuildInfo()
 	if ok {
@@ -82,6 +98,16 @@ func findOwnImportedVersion() {
 	}
 }
 
+// PingKafkaBrokers attempts to establish a TCP connection to each Kafka broker address
+// using the provided Dialer to ensure connectivity.
+//
+// Parameters:
+//   - ctx: context for timeout/cancellation
+//   - brokers: list of broker addresses (host:port)
+//   - dialer: kafka.Dialer instance to use for connection attempts
+//
+// Returns:
+//   - error if any broker cannot be reached
 func PingKafkaBrokers(ctx context.Context, brokers []string, dialer *kafka.Dialer) error {
 	if len(brokers) == 0 {
 		return fmt.Errorf("no Kafka brokers provided")
@@ -97,6 +123,14 @@ func PingKafkaBrokers(ctx context.Context, brokers []string, dialer *kafka.Diale
 	return nil
 }
 
+// PingKafkaWriter attempts to dial the Kafka writer's broker address to verify availability.
+//
+// Parameters:
+//   - ctx: context for timeout/cancellation
+//   - writer: the kafka.Writer to be tested
+//
+// Returns:
+//   - error if the writer is not reachable or dial fails
 func PingKafkaWriter(ctx context.Context, writer *kafka.Writer) error {
 	if writer == nil {
 		return nil

@@ -66,7 +66,6 @@ func trace(blacklistRouteLogResponse map[string]struct{}, sensitiveFields map[st
 				if json.Unmarshal(bodyBytes, &reqBody) == nil {
 					redactSensitiveFields(reqBody, sensitiveFields)
 				}
-				// reset body
 				c.Request.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
 			}
 		}

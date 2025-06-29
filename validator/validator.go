@@ -18,6 +18,35 @@ var (
 	TranslatorEn ut.Translator
 )
 
+// InitValidator initializes the global validator instance and sets up
+// default translations for both Indonesian and English.
+//
+// It configures:
+//   - A `json` tag lookup function for field name mapping
+//   - A global `Validate` instance from `go-playground/validator/v10`
+//   - Translators:
+//   - `TranslatorID`: Indonesian (`id`)
+//   - `TranslatorEn`: English (`en`)
+//
+// Notes:
+//   - If the translator is not found or the translation registration fails,
+//     the function will panic.
+//
+// This function ensures that validation errors use the `json` tag
+// instead of the struct field name.
+//
+// For example:
+//
+//	Struct field: `Username string `json:"username"`
+//	Validation error will show: `username` instead of `Username`
+//
+// Indonesian Translator:
+//   - Uses `id.New()` from go-playground/locales
+//   - Registers default translations using `id_translations.RegisterDefaultTranslations`
+//
+// English Translator:
+//   - Uses `en.New()` from go-playground/locales
+//   - Registers default translations using `en_translations.RegisterDefaultTranslations`
 func InitValidator() {
 	Validate = validator.New()
 	Validate.RegisterTagNameFunc(func(fld reflect.StructField) string {

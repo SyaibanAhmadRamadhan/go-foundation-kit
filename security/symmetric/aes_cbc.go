@@ -7,6 +7,20 @@ import (
 	"fmt"
 )
 
+// DecryptionStringCBC decrypts a base64-encoded cipher text string that was encrypted
+// using AES in CBC mode with PKCS7 padding. The IV is expected to be prefixed to the cipher text.
+//
+// Parameters:
+//   - enc: the base64-encoded encrypted string with IV prefix
+//   - key: the secret key used during encryption (must not exceed 32 characters)
+//
+// Returns:
+//   - the decrypted plaintext string
+//   - an error if decryption fails (e.g., invalid key, bad padding, malformed input)
+//
+// Note:
+//   - The same key used for encryption must be used here.
+//   - The IV is extracted from the beginning of the cipher text (first 16 bytes).
 func DecryptionStringCBC(enc string, key string) (string, error) {
 	if len(key) > 32 {
 		return "", fmt.Errorf("%s", "key must be 32 character")
@@ -38,6 +52,21 @@ func DecryptionStringCBC(enc string, key string) (string, error) {
 	return string(cipherText), nil
 }
 
+// EncryptionStringCBC encrypts a plaintext string using AES encryption in CBC mode
+// with PKCS7 padding. The result is base64-encoded and includes the IV as a prefix.
+//
+// Parameters:
+//   - text: the plaintext string to encrypt
+//   - key: the secret key (must not exceed 32 characters; padded internally)
+//
+// Returns:
+//   - a base64-encoded encrypted string that includes the IV prefix
+//   - an error if encryption fails or the key is too long
+//
+// Note:
+//   - The key should be 16, 24, or 32 bytes long for AES-128, AES-192, or AES-256 respectively.
+//   - If the key is shorter than 32 bytes, AES will pad/truncate internally.
+//   - The IV is randomly generated per encryption and prepended to the cipher text.
 func EncryptionStringCBC(text string, key string) (string, error) {
 	if len(key) > 32 {
 		return "", fmt.Errorf("%s", "key must be 32 character")

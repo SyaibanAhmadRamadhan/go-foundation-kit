@@ -11,6 +11,7 @@ import (
 	"resty.dev/v3"
 )
 
+// restyTracing provides OpenTelemetry instrumentation for the Resty HTTP client.
 type restyTracing struct {
 	client            *resty.Client
 	tracerProvider    trace.TracerProvider
@@ -20,6 +21,9 @@ type restyTracing struct {
 	spanNameFormatter spanNameFormatter
 }
 
+// NewOtel enables OpenTelemetry tracing for the provided Resty client.
+// It injects trace context into outbound requests, creates spans, and records
+// HTTP metadata for distributed tracing.
 func NewOtel(client *resty.Client, opts ...Option) {
 	client = client.EnableTrace()
 	tracing := &restyTracing{
@@ -45,6 +49,7 @@ func NewOtel(client *resty.Client, opts ...Option) {
 	client.OnError(tracing.onError())
 }
 
+// onBeforeRequest creates a Resty middleware to start a tracing span and inject headers before the request is sent.
 func (rt *restyTracing) onBeforeRequest() resty.RequestMiddleware {
 	return func(_ *resty.Client, req *resty.Request) error {
 		ctx, _ := rt.tracer.Start(req.Context(), rt.spanNameFormatter(nil, req), rt.spanOptions...)
@@ -54,6 +59,7 @@ func (rt *restyTracing) onBeforeRequest() resty.RequestMiddleware {
 	}
 }
 
+// onAfterResponse creates a Resty middleware to record HTTP response metadata and finish the tracing span.
 func (rt *restyTracing) onAfterResponse() resty.ResponseMiddleware {
 	return func(_ *resty.Client, res *resty.Response) error {
 		span := trace.SpanFromContext(res.Request.Context())
@@ -64,6 +70,7 @@ func (rt *restyTracing) onAfterResponse() resty.ResponseMiddleware {
 		req := res.Request
 		u, _ := url.Parse(req.URL)
 
+		// Add HTTP standard attributes
 		span.SetAttributes(
 			attribute.String("http.method", req.Method),
 			attribute.String("http.url", req.URL),
@@ -74,6 +81,7 @@ func (rt *restyTracing) onAfterResponse() resty.ResponseMiddleware {
 			attribute.String("http.status_text", res.Status()),
 		)
 
+		// Add timing attributes from Resty TraceInfo
 		ti := req.TraceInfo()
 		span.SetAttributes(
 			attribute.String("otel.trace.dns_lookup", ti.DNSLookup.String()),
@@ -89,12 +97,13 @@ func (rt *restyTracing) onAfterResponse() resty.ResponseMiddleware {
 		)
 
 		span.SetStatus(httpStatusToOtel(res.StatusCode()))
-		span.SetName(rt.spanNameFormatter(res, res.Request))
+		span.SetName(rt.spanNameFormatter(res, req))
 		span.End()
 		return nil
 	}
 }
 
+// onError returns a Resty error hook to record and finish a span if a request fails.
 func (r *restyTracing) onError() resty.ErrorHook {
 	return func(req *resty.Request, err error) {
 		span := trace.SpanFromContext(req.Context())
@@ -108,6 +117,7 @@ func (r *restyTracing) onError() resty.ErrorHook {
 	}
 }
 
+// httpStatusToOtel maps HTTP status codes to OpenTelemetry codes.
 func httpStatusToOtel(code int) (codes.Code, string) {
 	if code >= 100 && code < 400 {
 		return codes.Unset, "Successfully http client"
