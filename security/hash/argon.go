@@ -14,7 +14,7 @@ const (
 	memory     = 64 * 1024 // 64 MB
 	time       = 3         // Iterasi
 	threads    = 4         // Paralelisme
-	keyLen     = 32        // length hasil hash
+	keyLen     = 32        // length result hash
 	saltLength = 16
 )
 

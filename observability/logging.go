@@ -12,14 +12,18 @@ import (
 	"go.opentelemetry.io/otel/trace"
 )
 
+// LogConfig contains configuration options for setting up structured logging.
 type LogConfig struct {
-	Hook        io.Writer // e.g., Kafka writer
-	Mode        string    // "text" or "json" (for slog)
-	Level       string    // "info", "debug", etc.
-	Env         string    // "production", "staging", etc.
-	ServiceName string
+	Hook        io.Writer // Optional log sink (e.g., Kafka writer). If nil, logs won't be sent to external sinks.
+	Mode        string    // Output format: "text" or "json" for slog.
+	Level       string    // Log level: "info", "debug", "warn", "error", etc.
+	Env         string    // Environment name: "production", "staging", "development", etc.
+	ServiceName string    // The name of the service emitting the logs.
 }
 
+// NewLog initializes slog and zerolog based on the provided configuration.
+// - If cfg.Hook is nil, logs will only be printed to stdout.
+// - slog is used for local logs; zerolog is used for structured logs (e.g., Kafka).
 func NewLog(cfg LogConfig) {
 
 	slogLevel := parseLevel(cfg.Level)
@@ -33,7 +37,7 @@ func NewLog(cfg LogConfig) {
 		slog.String("level", cfg.Level),
 	)
 
-	if cfg.Hook == nil {
+	if cfg.Hook != nil {
 		zerolog.TimeFieldFormat = zerolog.TimeFormatUnix
 		zerologLevel := parseZerologLevel(cfg.Level)
 
@@ -47,6 +51,7 @@ func NewLog(cfg LogConfig) {
 	}
 }
 
+// buildSlogHandler returns a slog.Handler configured with the specified mode and log level.
 func buildSlogHandler(mode string, level slog.Level) slog.Handler {
 	opts := &slog.HandlerOptions{Level: level}
 	switch strings.ToLower(mode) {
@@ -57,6 +62,8 @@ func buildSlogHandler(mode string, level slog.Level) slog.Handler {
 	}
 }
 
+// parseLevel converts a string log level into a slog.Level.
+// Defaults to slog.LevelInfo if level is unrecognized.
 func parseLevel(level string) slog.Level {
 	switch strings.ToLower(level) {
 	case "debug":
@@ -70,6 +77,8 @@ func parseLevel(level string) slog.Level {
 	}
 }
 
+// parseZerologLevel converts a string log level into a zerolog.Level.
+// Defaults to zerolog.InfoLevel if level is unrecognized.
 func parseZerologLevel(level string) zerolog.Level {
 	switch strings.ToLower(level) {
 	case "debug":
@@ -85,6 +94,13 @@ func parseZerologLevel(level string) zerolog.Level {
 	}
 }
 
+// Start returns a zerolog event enriched with OpenTelemetry trace and span IDs extracted from context.
+// This is useful for logging within distributed tracing environments.
+//
+// Example:
+//
+//	log := observability.Start(ctx, zerolog.InfoLevel)
+//	log.Msg("some message")
 func Start(ctx context.Context, level zerolog.Level) *zerolog.Event {
 	traceID := ""
 	spanID := ""

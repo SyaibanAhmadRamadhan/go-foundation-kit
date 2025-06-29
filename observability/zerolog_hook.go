@@ -9,14 +9,21 @@ import (
 	"github.com/segmentio/kafka-go"
 )
 
+// KafkaHook is a custom log writer that sends log entries to a Kafka topic.
+// It can optionally print logs to the terminal in non-production environments.
 type KafkaHook struct {
-	writer      *kafka.Writer
-	topic       string
-	env         string
-	serviceName string
-	onlySink    bool // The log should only be sent to the sink (e.g., Kafka, file, etc.) and not printed to the terminal via slog, even if the environment is not "production".
+	writer      *kafka.Writer // Kafka writer instance.
+	topic       string        // Kafka topic where logs will be published.
+	env         string        // Current environment (e.g., "production", "staging", "development").
+	serviceName string        // Name of the service generating logs.
+	onlySink    bool          // If true, logs are only sent to the sink and not printed to the terminal.
 }
 
+// Write implements the io.Writer interface for KafkaHook.
+// It sends the log `p` to Kafka, optionally printing it to the terminal based on environment.
+//
+// Log payload is expected to be in JSON format.
+// It enriches Kafka headers with fields like level, trace_id, span_id, and status_code (if present).
 func (w *KafkaHook) Write(p []byte) (n int, err error) {
 	if w.env != "production" && !w.onlySink {
 		slog.Info("log output (non-production)",

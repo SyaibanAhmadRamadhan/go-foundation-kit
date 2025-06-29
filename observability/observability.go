@@ -9,14 +9,21 @@ import (
 	"go.opentelemetry.io/otel/trace"
 )
 
+// OptionParams defines the configuration for setting up OpenTelemetry observability.
 type OptionParams struct {
-	ServiceName  string
-	Env          string
-	OtlpEndpoint string
-	OtlpUsername string
-	OtlpPassword string
+	ServiceName  string // The name of the service used for tracing.
+	Env          string // The environment (e.g., "development", "staging", "production").
+	OtlpEndpoint string // The OTLP exporter endpoint.
+	OtlpUsername string // The username for OTLP authentication.
+	OtlpPassword string // The password for OTLP authentication.
 }
 
+// NewObservabilityOtel initializes OpenTelemetry tracing and returns a tracer and cleanup function.
+//
+// It returns:
+//   - trace.Tracer: the tracer instance to be used for creating spans.
+//   - func(): a cleanup function that should be called before shutdown.
+//   - error: if initialization fails.
 func NewObservabilityOtel(params OptionParams) (trace.Tracer, func(), error) {
 	closeFunc, err := NewOtel(params.ServiceName, params.OtlpEndpoint, params.OtlpUsername, params.OtlpPassword)
 	if err != nil {
@@ -28,17 +35,20 @@ func NewObservabilityOtel(params OptionParams) (trace.Tracer, func(), error) {
 	}, err
 }
 
+// LogWithKafkaHookOptions contains configuration for setting up logging with a Kafka sink.
 type LogWithKafkaHookOptions struct {
-	KafkaAddrs  []string
-	Transport   *kafka.Transport
-	Topic       string
-	Env         string
-	ServiceName string
-	LogMode     string // LogMode  "text" or "json"
-	LogLevel    string // "info", "debug", etc.
-	OnlySink    bool   // The log should only be sent to the sink (e.g., Kafka, file, etc.) and not printed to the terminal via slog, even if the environment is not "production".
+	KafkaAddrs  []string         // List of Kafka broker addresses.
+	Transport   *kafka.Transport // Optional custom transport (e.g., with TLS, SASL).
+	Topic       string           // Kafka topic to write logs to.
+	Env         string           // The environment (e.g., "production", "development").
+	ServiceName string           // The name of the service emitting logs.
+	LogMode     string           // Log output format: "text" or "json".
+	LogLevel    string           // Minimum log level: "info", "debug", etc.
+	OnlySink    bool             // If true, logs are only sent to the sink and not printed to terminal.
 }
 
+// NewLogWithKafkaHook sets up structured logging using slog with a Kafka writer as the hook.
+// It returns a cleanup function that should be deferred or called on shutdown to close the Kafka writer.
 func NewLogWithKafkaHook(optionsParams LogWithKafkaHookOptions) func() {
 	w := &kafka.Writer{
 		Addr:            kafka.TCP(optionsParams.KafkaAddrs...),

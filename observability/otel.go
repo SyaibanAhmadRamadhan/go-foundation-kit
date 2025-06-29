@@ -16,6 +16,17 @@ import (
 	semconv "go.opentelemetry.io/otel/semconv/v1.26.0"
 )
 
+// NewOtel initializes OpenTelemetry tracing with OTLP exporter using basic authentication.
+//
+// Parameters:
+//   - serviceName: the name of the service used for resource identification.
+//   - otlpEndpoint: the OTLP gRPC endpoint (e.g., "localhost:4317").
+//   - otlpUsername: username for Basic Auth.
+//   - otlpPassword: password for Basic Auth.
+//
+// Returns:
+//   - func(): a function to shut down the exporter and tracer provider gracefully.
+//   - error: any error that occurs during setup.
 func NewOtel(serviceName, otlpEndpoint, otlpUsername, otlpPassword string) (func(), error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -50,6 +61,16 @@ func NewOtel(serviceName, otlpEndpoint, otlpUsername, otlpPassword string) (func
 	return closeFunc, nil
 }
 
+// startTraceProvider sets up the tracer provider with resource attributes and span processor.
+//
+// Parameters:
+//   - exporter: the OTLP trace exporter.
+//   - serviceName: the name of the service.
+//
+// Returns:
+//   - *trace.TracerProvider: the initialized tracer provider.
+//   - func(): a cleanup function to shut down the provider and exporter.
+//   - error: any error during initialization.
 func startTraceProvider(exporter *otlptrace.Exporter, serviceName string) (*trace.TracerProvider, func(), error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -99,6 +120,12 @@ func startTraceProvider(exporter *otlptrace.Exporter, serviceName string) (*trac
 	return provider, closeFn, nil
 }
 
+// ExtractTraceparent injects the current trace context from the provided context into a carrier,
+// and returns the "traceparent" header string.
+//
+// This is useful for propagating tracing info across services via HTTP headers, etc.
+//
+// Example return: "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-00"
 func ExtractTraceparent(ctx context.Context) string {
 	carrier := propagation.MapCarrier{}
 	otel.GetTextMapPropagator().Inject(ctx, carrier)
