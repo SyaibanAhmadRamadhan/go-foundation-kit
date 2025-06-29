@@ -17,15 +17,19 @@ func (b *broker) Publish(ctx context.Context, input PubInput) (output PubOutput,
 		return
 	}
 
-	var ctxTracer context.Context
+	var ctxTracer []context.Context
 	if b.pubTracer != nil {
-		ctxTracer = b.pubTracer.TracePubStart(ctx, &input.Messages[0])
+		for _, v := range input.Messages {
+			ctxTracer = append(ctxTracer, b.pubTracer.TracePubStart(ctx, &v))
+		}
 	}
 
 	err = b.kafkaWriter.WriteMessages(ctx, input.Messages...)
 
 	if b.pubTracer != nil {
-		b.pubTracer.TracePubEnd(ctxTracer, output, err)
+		for _, v := range ctxTracer {
+			b.pubTracer.TracePubEnd(v, output, err)
+		}
 	}
 	return
 }
