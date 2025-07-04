@@ -55,7 +55,7 @@ func NewLogWithKafkaHook(optionsParams LogWithKafkaHookOptions) func() {
 		Topic:           optionsParams.Topic,
 		Balancer:        &kafka.LeastBytes{},
 		MaxAttempts:     5,
-		WriteBackoffMin: time.Duration(100),
+		WriteBackoffMin: time.Duration(100 * time.Millisecond),
 		WriteBackoffMax: time.Duration(1 * time.Second),
 
 		BatchSize:    10,
@@ -67,11 +67,11 @@ func NewLogWithKafkaHook(optionsParams LogWithKafkaHookOptions) func() {
 	}
 	NewLog(LogConfig{
 		Hook: &KafkaHook{
-			writer:      w,
-			topic:       optionsParams.Topic,
-			env:         optionsParams.Env,
-			serviceName: optionsParams.ServiceName,
-			onlySink:    optionsParams.OnlySink,
+			Writer:      w,
+			Topic:       optionsParams.Topic,
+			Env:         optionsParams.Env,
+			ServiceName: optionsParams.ServiceName,
+			OnlySink:    optionsParams.OnlySink,
 		},
 		Mode:        optionsParams.LogMode,
 		Level:       optionsParams.LogLevel,

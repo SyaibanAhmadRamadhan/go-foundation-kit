@@ -12,11 +12,11 @@ import (
 // KafkaHook is a custom log writer that sends log entries to a Kafka topic.
 // It can optionally print logs to the terminal in non-production environments.
 type KafkaHook struct {
-	writer      *kafka.Writer // Kafka writer instance.
-	topic       string        // Kafka topic where logs will be published.
-	env         string        // Current environment (e.g., "production", "staging", "development").
-	serviceName string        // Name of the service generating logs.
-	onlySink    bool          // If true, logs are only sent to the sink and not printed to the terminal.
+	Writer      *kafka.Writer // Kafka writer instance.
+	Topic       string        // Kafka topic where logs will be published.
+	Env         string        // Current environment (e.g., "production", "staging", "development").
+	ServiceName string        // Name of the service generating logs.
+	OnlySink    bool          // If true, logs are only sent to the sink and not printed to the terminal.
 }
 
 // Write implements the io.Writer interface for KafkaHook.
@@ -25,18 +25,18 @@ type KafkaHook struct {
 // Log payload is expected to be in JSON format.
 // It enriches Kafka headers with fields like level, trace_id, span_id, and status_code (if present).
 func (w *KafkaHook) Write(p []byte) (n int, err error) {
-	if w.env != "production" && !w.onlySink {
+	if w.Env != "production" && !w.OnlySink {
 		slog.Info("log output (non-production)",
-			slog.String("service", w.serviceName),
-			slog.String("env", w.env),
+			slog.String("service", w.ServiceName),
+			slog.String("env", w.Env),
 			slog.String("log", string(p)),
 		)
 	}
 	var payload map[string]any
 	if err := json.Unmarshal(p, &payload); err != nil {
 		slog.Error("KafkaLogWriter: failed to parse log JSON",
-			slog.String("service", w.serviceName),
-			slog.String("env", w.env),
+			slog.String("service", w.ServiceName),
+			slog.String("env", w.Env),
 			slog.Any("error", err),
 			slog.String("raw", string(p)),
 		)
@@ -48,8 +48,8 @@ func (w *KafkaHook) Write(p []byte) (n int, err error) {
 	spanID := payload["span_id"]
 	traceID := payload["trace_id"]
 	headers := []kafka.Header{
-		{Key: "service_name", Value: []byte(w.serviceName)},
-		{Key: "env", Value: []byte(w.env)},
+		{Key: "service_name", Value: []byte(w.ServiceName)},
+		{Key: "env", Value: []byte(w.Env)},
 		{Key: "level", Value: fmt.Appendf(nil, "%v", level)},
 	}
 
@@ -71,22 +71,21 @@ func (w *KafkaHook) Write(p []byte) (n int, err error) {
 
 	if traceID == nil {
 		slog.Warn("KafkaLogWriter: log entry missing trace_id",
-			slog.String("service", w.serviceName),
-			slog.String("env", w.env),
+			slog.String("service", w.ServiceName),
+			slog.String("env", w.Env),
 			slog.Any("payload", payload),
 		)
 		return
 	}
 
-	err = w.writer.WriteMessages(context.Background(), kafka.Message{
+	err = w.Writer.WriteMessages(context.Background(), kafka.Message{
 		Value:   p,
 		Headers: headers,
-		Key:     fmt.Appendf(nil, "%v", traceID),
 	})
 	if err != nil {
 		slog.Error("KafkaLogWriter: failed to send log to Kafka",
-			slog.String("service", w.serviceName),
-			slog.String("env", w.env),
+			slog.String("service", w.ServiceName),
+			slog.String("env", w.Env),
 			slog.Any("error", err),
 			slog.String("trace_id", fmt.Sprintf("%v", traceID)),
 		)
