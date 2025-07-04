@@ -78,8 +78,18 @@ func (w *KafkaHook) Write(p []byte) (n int, err error) {
 		return
 	}
 
+	newP, err := json.Marshal(payload)
+	if err != nil {
+		slog.Error("KafkaLogWriter: failed to marshal log JSON",
+			slog.String("service", w.ServiceName),
+			slog.String("env", w.Env),
+			slog.Any("error", err),
+			slog.String("raw", string(p)),
+		)
+		return
+	}
 	err = w.Writer.WriteMessages(context.Background(), kafka.Message{
-		Value:   p,
+		Value:   newP,
 		Headers: headers,
 	})
 	if err != nil {
