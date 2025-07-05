@@ -15,7 +15,7 @@ import (
 // Returns:
 //   - token string if successful
 //   - error if signing fails
-func GenerateHS256(secret string, claims jwt.Claims) (string, error) {
+func GenerateHS256(secret string, claims jwt.RegisteredClaims) (string, error) {
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	tokenStr, err := token.SignedString([]byte(secret))
 	if err != nil {
