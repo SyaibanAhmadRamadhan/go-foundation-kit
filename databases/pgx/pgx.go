@@ -49,6 +49,14 @@ func NewRDBMS(db *pgxpool.Pool) *rdbms {
 	}
 }
 
+func NewRDBMSWithExecutor(db *pgxpool.Pool, executor queryExecutor) *rdbms {
+	return &rdbms{
+		db:            db,
+		queryExecutor: executor,
+		isTx:          true,
+	}
+}
+
 // QuerySq executes a SELECT query built with squirrel and returns the result rows.
 func (s *rdbms) QuerySq(ctx context.Context, query squirrel.Sqlizer) (pgx.Rows, error) {
 	rawQuery, args, err := query.ToSql()
@@ -108,14 +116,6 @@ func (s *rdbms) QuerySqPagination(
 	return rows, primitive.CreatePaginationOutput(paginationInput, totalData), nil
 }
 
-// injectTx creates a new rdbms instance that uses the given transaction for query execution.
-func (s *rdbms) injectTx(tx pgx.Tx) *rdbms {
-	newRdbms := *s
-	newRdbms.queryExecutor = tx
-	newRdbms.isTx = true
-	return &newRdbms
-}
-
 // DoTx executes a function within a database transaction.
 // It commits the transaction if fn returns nil, otherwise rolls it back.
 func (s *rdbms) DoTx(ctx context.Context, opt pgx.TxOptions, fn func(tx RDBMS) error) (err error) {
@@ -146,7 +146,7 @@ func (s *rdbms) DoTx(ctx context.Context, opt pgx.TxOptions, fn func(tx RDBMS) e
 		}
 	}()
 
-	return fn(s.injectTx(tx))
+	return fn(NewRDBMSWithExecutor(s.db, tx))
 }
 
 // DoTxContext is like DoTx but also passes the context to the transactional function.
@@ -182,5 +182,5 @@ func (s *rdbms) DoTxContext(
 		}
 	}()
 
-	return fn(ctx, s.injectTx(tx))
+	return fn(ctx, NewRDBMSWithExecutor(s.db, tx))
 }

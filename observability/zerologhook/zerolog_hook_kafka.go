@@ -1,4 +1,4 @@
-package observability
+package zerologhook
 
 import (
 	"context"

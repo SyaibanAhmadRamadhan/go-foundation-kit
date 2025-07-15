@@ -4,6 +4,7 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/SyaibanAhmadRamadhan/go-foundation-kit/observability/zerologhook"
 	"github.com/segmentio/kafka-go"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/trace"
@@ -25,7 +26,7 @@ type OptionParams struct {
 //   - func(): a cleanup function that should be called before shutdown.
 //   - error: if initialization fails.
 func NewObservabilityOtel(params OptionParams) (trace.Tracer, func(), error) {
-	closeFunc, err := NewOtel(params.ServiceName, params.OtlpEndpoint, params.OtlpUsername, params.OtlpPassword)
+	closeFunc, err := NewOtlp(params.ServiceName, params.OtlpEndpoint, params.OtlpUsername, params.OtlpPassword)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -66,7 +67,7 @@ func NewLogWithKafkaHook(optionsParams LogWithKafkaHookOptions) func() {
 		Transport:    optionsParams.Transport,
 	}
 	NewLog(LogConfig{
-		Hook: &KafkaHook{
+		Hook: &zerologhook.KafkaHook{
 			Writer:      w,
 			Topic:       optionsParams.Topic,
 			Env:         optionsParams.Env,

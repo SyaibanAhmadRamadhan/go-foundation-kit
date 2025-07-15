@@ -8,15 +8,17 @@ import (
 	"time"
 
 	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetricgrpc"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
 	"go.opentelemetry.io/otel/propagation"
+	"go.opentelemetry.io/otel/sdk/metric"
 	"go.opentelemetry.io/otel/sdk/resource"
 	"go.opentelemetry.io/otel/sdk/trace"
 	semconv "go.opentelemetry.io/otel/semconv/v1.26.0"
 )
 
-// NewOtel initializes OpenTelemetry tracing with OTLP exporter using basic authentication.
+// NewOtlp initializes OpenTelemetry tracing and metrics with the OTLP (OpenTelemetry Protocol) exporter stack using basic authentication.
 //
 // Parameters:
 //   - serviceName: the name of the service used for resource identification.
@@ -27,7 +29,7 @@ import (
 // Returns:
 //   - func(): a function to shut down the exporter and tracer provider gracefully.
 //   - error: any error that occurs during setup.
-func NewOtel(serviceName, otlpEndpoint, otlpUsername, otlpPassword string) (func(), error) {
+func NewOtlp(serviceName, otlpEndpoint, otlpUsername, otlpPassword string) (func(), error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
@@ -48,30 +50,44 @@ func NewOtel(serviceName, otlpEndpoint, otlpUsername, otlpPassword string) (func
 		return nil, err
 	}
 
-	traceProvider, closeFunc, err := startTraceProvider(traceExp, serviceName)
+	metricExp, err := otlpmetricgrpc.New(ctx,
+		otlpmetricgrpc.WithInsecure(),
+		otlpmetricgrpc.WithHeaders(map[string]string{
+			"Authorization": basicAuth,
+		}),
+		otlpmetricgrpc.WithEndpoint(otlpEndpoint),
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	tp, mp, closeFunc, err := startTraceAndMeterProvider(traceExp, metricExp, serviceName)
 	if err != nil {
 		return nil, err
 	}
 
 	otel.SetTextMapPropagator(propagation.NewCompositeTextMapPropagator(propagation.TraceContext{}, propagation.Baggage{}))
-	otel.SetTracerProvider(traceProvider)
+	otel.SetTracerProvider(tp)
+	otel.SetMeterProvider(mp)
 	slog.Info("OpenTelemetry tracer provider initialized",
 		slog.String("service", serviceName),
 	)
 	return closeFunc, nil
 }
 
-// startTraceProvider sets up the tracer provider with resource attributes and span processor.
+// startTraceAndMeterProvider sets up the OpenTelemetry TracerProvider and MeterProvider using the provided OTLP exporters.
 //
 // Parameters:
-//   - exporter: the OTLP trace exporter.
-//   - serviceName: the name of the service.
+//   - traceExp: the OTLP trace exporter.
+//   - metricExp: the OTLP metric exporter.
+//   - serviceName: the name of the service for resource attribution.
 //
 // Returns:
 //   - *trace.TracerProvider: the initialized tracer provider.
-//   - func(): a cleanup function to shut down the provider and exporter.
-//   - error: any error during initialization.
-func startTraceProvider(exporter *otlptrace.Exporter, serviceName string) (*trace.TracerProvider, func(), error) {
+//   - *metric.MeterProvider: the initialized meter provider.
+//   - func(): a function to shut down all providers and exporters gracefully.
+//   - error: any error that occurs during initialization.
+func startTraceAndMeterProvider(traceExp *otlptrace.Exporter, metricExp *otlpmetricgrpc.Exporter, serviceName string) (*trace.TracerProvider, *metric.MeterProvider, func(), error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
@@ -88,14 +104,19 @@ func startTraceProvider(exporter *otlptrace.Exporter, serviceName string) (*trac
 			slog.String("service", serviceName),
 			slog.Any("error", err),
 		)
-		return nil, nil, fmt.Errorf("failed to create OpenTelemetry resource: %w", err)
+		return nil, nil, nil, fmt.Errorf("failed to create OpenTelemetry resource: %w", err)
 	}
 
-	bsp := trace.NewBatchSpanProcessor(exporter)
-	provider := trace.NewTracerProvider(
+	bsp := trace.NewBatchSpanProcessor(traceExp)
+	tp := trace.NewTracerProvider(
 		trace.WithSpanProcessor(bsp),
 		trace.WithResource(res),
 		trace.WithSampler(trace.AlwaysSample()),
+	)
+
+	mp := metric.NewMeterProvider(
+		metric.WithReader(metric.NewPeriodicReader(metricExp,
+			metric.WithInterval(3*time.Second))),
 	)
 
 	closeFn := func() {
@@ -104,20 +125,32 @@ func startTraceProvider(exporter *otlptrace.Exporter, serviceName string) (*trac
 
 		slog.Info("shutting down OpenTelemetry components...")
 
-		if err := exporter.Shutdown(ctxClosure); err != nil {
-			slog.Error("failed to shutdown OpenTelemetry exporter", slog.Any("error", err))
+		if err := traceExp.Shutdown(ctxClosure); err != nil {
+			slog.Error("failed to shutdown OpenTelemetry trace exporter", slog.Any("error", err))
 		} else {
-			slog.Info("OpenTelemetry exporter shutdown complete")
+			slog.Info("OpenTelemetry trace exporter shutdown complete")
 		}
 
-		if err := provider.Shutdown(ctxClosure); err != nil {
+		if err := metricExp.Shutdown(ctxClosure); err != nil {
+			slog.Error("failed to shutdown OpenTelemetry metric exporter", slog.Any("error", err))
+		} else {
+			slog.Info("OpenTelemetry metric exporter shutdown complete")
+		}
+
+		if err := tp.Shutdown(ctxClosure); err != nil {
 			slog.Error("failed to shutdown tracer provider", slog.Any("error", err))
 		} else {
 			slog.Info("OpenTelemetry tracer provider shutdown complete")
 		}
+
+		if err := mp.Shutdown(ctxClosure); err != nil {
+			slog.Error("failed to shutdown metric provider", slog.Any("error", err))
+		} else {
+			slog.Info("OpenTelemetry metric provider shutdown complete")
+		}
 	}
 
-	return provider, closeFn, nil
+	return tp, mp, closeFn, nil
 }
 
 // ExtractTraceparent injects the current trace context from the provided context into a carrier,
