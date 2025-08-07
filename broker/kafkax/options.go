@@ -1,4 +1,4 @@
-package libkafka
+package kafkax
 
 import (
 	"github.com/segmentio/kafka-go"
@@ -36,33 +36,19 @@ func KafkaCustomWriter(k *kafka.Writer) Options {
 	}
 }
 
-// WithOtel enables OpenTelemetry tracing for publisher, subscriber, and commit events.
+// WithTracer sets custom tracer implementations for publish, subscribe, and commit operations.
 //
-// It injects a default Otel tracer implementation into the broker.
-// Make sure your application is already setting up OpenTelemetry globally (e.g., exporter, tracer provider, etc).
-func WithOtel() Options {
-	return func(cfg *broker) {
-		o := NewOtel()
-		cfg.pubTracer = o
-		cfg.subTracer = o
-		cfg.commitTracer = o
-	}
-}
-
-// WithYourCustomTracer allows you to inject your own custom tracer implementation
-// for publishing, subscribing, and message committing.
-//
-// This is useful if you want to plug in a different tracing backend or a
-// mock tracer for testing.
+// This can be useful when integrating with a different tracing backend
+// or injecting mock tracers during testing.
 //
 // Parameters:
-//   - pub: Tracer for publish operations
-//   - sub: Tracer for subscribe operations
-//   - commit: Tracer for message commit operations
-func WithYourCustomTracer(pub TracerPub, sub TracerSub, commit TracerCommitMessage) Options {
+//   - pub: Tracer used for publishing messages.
+//   - sub: Tracer used for subscribing to messages.
+//   - commit: Tracer used for committing message processing.
+func WithTracer(pub KafkaTracerPub, consume KafkaTracerConsume, commit KafkaTracerCommitMessage) Options {
 	return func(cfg *broker) {
 		cfg.pubTracer = pub
-		cfg.subTracer = sub
+		cfg.consumeTracer = consume
 		cfg.commitTracer = commit
 	}
 }

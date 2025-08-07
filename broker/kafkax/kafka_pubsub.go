@@ -1,4 +1,4 @@
-package libkafka
+package kafkax
 
 import (
 	"context"
@@ -69,11 +69,11 @@ func (b *broker) Subscribe(ctx context.Context, input SubInput) (output SubOutpu
 	}
 
 	readerWrapper := &Reader{
-		R:            reader,
-		subTracer:    b.subTracer,
-		commitTracer: b.commitTracer,
-		groupID:      input.Config.GroupID,
-		unmarshal:    input.Unmarshal,
+		R:             reader,
+		consumeTracer: b.consumeTracer,
+		commitTracer:  b.commitTracer,
+		groupID:       input.Config.GroupID,
+		unmarshal:     input.Unmarshal,
 	}
 
 	b.readers = append(b.readers, readerWrapper)

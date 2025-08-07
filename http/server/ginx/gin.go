@@ -1,4 +1,4 @@
-package libgin
+package ginx
 
 import (
 	"github.com/gin-gonic/gin"
@@ -30,6 +30,7 @@ type GinConfig struct {
 	Validator                 *validator.Validate // Validator instance for request validation
 	CorsConf                  CorsConfig          // CORS configuration
 	AppName                   string              // Application name for OpenTelemetry tracing
+	UseOtel                   bool
 }
 
 // NewGin creates and returns a configured *gin.Engine instance.
@@ -44,7 +45,9 @@ func NewGin(conf GinConfig) *gin.Engine {
 
 	router.Use(gin.Recovery())
 	router.Use(cors(conf.CorsConf))
-	router.Use(otelgin.Middleware(conf.AppName))
+	if conf.UseOtel {
+		router.Use(otelgin.Middleware(conf.AppName))
+	}
 	router.Use(trace(conf.BlacklistRouteLogResponse, conf.SensitiveFields))
 
 	return router

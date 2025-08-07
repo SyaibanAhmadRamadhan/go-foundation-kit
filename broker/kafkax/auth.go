@@ -1,4 +1,4 @@
-package libkafka
+package kafkax
 
 import (
 	"context"

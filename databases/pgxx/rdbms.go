@@ -1,4 +1,4 @@
-package libpgx
+package pgxx
 
 import (
 	"context"

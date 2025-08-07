@@ -1,11 +1,10 @@
-package libkafka
+package kafkax
 
 import (
 	"context"
 	"errors"
 	"fmt"
 	"log/slog"
-	"runtime/debug"
 	"time"
 
 	"github.com/segmentio/kafka-go"
@@ -19,11 +18,11 @@ var ErrJsonUnmarshal = errors.New("json unmarshal error")
 
 // broker manages Kafka readers and writers, along with optional tracing integrations.
 type broker struct {
-	kafkaWriter  *kafka.Writer
-	pubTracer    TracerPub
-	subTracer    TracerSub
-	commitTracer TracerCommitMessage
-	readers      []*Reader
+	kafkaWriter   *kafka.Writer
+	pubTracer     KafkaTracerPub
+	consumeTracer KafkaTracerConsume
+	commitTracer  KafkaTracerCommitMessage
+	readers       []*Reader
 }
 
 // New creates a new broker instance with optional configurations applied via functional options.
@@ -82,19 +81,6 @@ func (b *broker) Close() {
 		}
 	} else {
 		slog.Info("broker closed cleanly without errors")
-	}
-}
-
-// findOwnImportedVersion reads the build info to detect and store the imported version of the Tracer library.
-// This is useful for debugging or version diagnostics in observability systems.
-func findOwnImportedVersion() {
-	buildInfo, ok := debug.ReadBuildInfo()
-	if ok {
-		for _, dep := range buildInfo.Deps {
-			if dep.Path == TracerName {
-				kafkaLibVersion = dep.Version
-			}
-		}
 	}
 }
 

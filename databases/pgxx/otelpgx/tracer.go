@@ -27,8 +27,8 @@ import (
 )
 
 const (
-	tracerName          = "github.com/SyaibanAhmadRamadhan/go-foundation-kit/databases/pgx/otelpgx"
-	meterName           = "github.com/SyaibanAhmadRamadhan/go-foundation-kit/databases/pgx/otelpgx"
+	tracerName          = "github.com/SyaibanAhmadRamadhan/go-foundation-kit/databases/pgxx/otelpgx"
+	meterName           = "github.com/SyaibanAhmadRamadhan/go-foundation-kit/databases/pgxx/otelpgx"
 	startTimeCtxKey     = "otelpgxStartTime"
 	sqlOperationUnknown = "UNKNOWN"
 )

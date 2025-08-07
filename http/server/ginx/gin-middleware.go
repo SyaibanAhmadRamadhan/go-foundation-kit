@@ -1,4 +1,4 @@
-package libgin
+package ginx
 
 import (
 	"bytes"

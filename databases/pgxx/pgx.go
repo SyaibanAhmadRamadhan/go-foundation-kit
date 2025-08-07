@@ -1,4 +1,4 @@
-package libpgx
+package pgxx
 
 import (
 	"context"
@@ -7,7 +7,7 @@ import (
 	"fmt"
 
 	"github.com/Masterminds/squirrel"
-	"github.com/SyaibanAhmadRamadhan/go-foundation-kit/databases/pgx/otelpgx"
+	"github.com/SyaibanAhmadRamadhan/go-foundation-kit/databases/pgxx/otelpgx"
 	"github.com/SyaibanAhmadRamadhan/go-foundation-kit/utils/primitive"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"

@@ -1,13 +1,16 @@
 package observability
 
 import (
+	"context"
 	"log/slog"
 	"time"
 
+	"github.com/SyaibanAhmadRamadhan/go-foundation-kit/observability/otelx"
 	"github.com/SyaibanAhmadRamadhan/go-foundation-kit/observability/zerologhook"
 	"github.com/segmentio/kafka-go"
-	"go.opentelemetry.io/otel"
-	"go.opentelemetry.io/otel/trace"
+	"go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetricgrpc"
+	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
+	"go.opentelemetry.io/otel/sdk/metric"
 )
 
 // OptionParams defines the configuration for setting up OpenTelemetry observability.
@@ -25,14 +28,38 @@ type OptionParams struct {
 //   - trace.Tracer: the tracer instance to be used for creating spans.
 //   - func(): a cleanup function that should be called before shutdown.
 //   - error: if initialization fails.
-func NewObservabilityOtel(params OptionParams) (trace.Tracer, func(), error) {
-	closeFunc, err := NewOtlp(params.ServiceName, params.OtlpEndpoint, params.OtlpUsername, params.OtlpPassword)
+func NewObservabilityOtel(params OptionParams) (func(), error) {
+	closeFuncTrace, err := otelx.NewTrace().
+		WithGlobalTraceProvider().
+		WithExporterGrpcBasicAuth(
+			context.Background(),
+			params.OtlpUsername,
+			params.OtlpPassword,
+			params.OtlpEndpoint,
+			otlptracegrpc.WithInsecure(),
+		).
+		Init(context.Background(), params.ServiceName)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
-	return otel.Tracer(params.ServiceName), func() {
-		closeFunc()
+	closeFuncMetric, err := otelx.NewMetric().
+		WithGlobalMetricProvider().
+		WithExporterGrpcBasicAuth(
+			context.Background(),
+			params.OtlpUsername,
+			params.OtlpPassword,
+			params.OtlpEndpoint,
+			otlpmetricgrpc.WithInsecure(),
+		).
+		WithPeriodicReader(
+			metric.WithInterval(3*time.Second),
+		).
+		Init(context.Background(), params.ServiceName)
+
+	return func() {
+		closeFuncTrace()
+		closeFuncMetric()
 	}, err
 }
 

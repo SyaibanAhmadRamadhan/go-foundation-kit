@@ -1,4 +1,6 @@
-package libkafka
+//go:generate go tool mockgen -destination=../../.mocking/kafkax_mock.go -package=gofoundationkitmock . KafkaTracerPub,KafkaTracerConsume,KafkaTracerCommitMessage,KafkaPubSub
+
+package kafkax
 
 import (
 	"context"
@@ -38,28 +40,28 @@ type SubOutput struct {
 
 // TracerPub is the interface for tracing publish operations.
 // You can implement this to hook into publish start/end spans or logs.
-type TracerPub interface {
+type KafkaTracerPub interface {
 	TracePubStart(ctx context.Context, msg *kafka.Message) context.Context
 	TracePubEnd(ctx context.Context, input PubOutput, err error)
 }
 
-// TracerSub is the interface for tracing Kafka message consumption.
+// TracerConsume is the interface for tracing Kafka message consumption.
 // You can use it to track the lifecycle of a consumed message.
-type TracerSub interface {
-	TraceSubStart(ctx context.Context, groupID string, msg *kafka.Message) context.Context
-	TraceSubEnd(ctx context.Context, err error)
+type KafkaTracerConsume interface {
+	TraceConsumeStart(ctx context.Context, groupID string, msg *kafka.Message) context.Context
+	TraceConsumeEnd(ctx context.Context, err error)
 }
 
 // TracerCommitMessage is the interface for tracing Kafka message commits.
 // Useful for acknowledging offsets with observability support.
-type TracerCommitMessage interface {
+type KafkaTracerCommitMessage interface {
 	TraceCommitMessagesStart(ctx context.Context, groupID string, messages ...kafka.Message) []context.Context
 	TraceCommitMessagesEnd(ctx []context.Context, err error)
 }
 
 // PubSub defines a contract for a Kafka publisher-subscriber abstraction.
 // It can be used to send and receive messages from Kafka with optional tracing and decoding.
-type PubSub interface {
+type KafkaPubSub interface {
 	Publish(ctx context.Context, input PubInput) (output PubOutput, err error)
 	Subscribe(ctx context.Context, input SubInput) (output SubOutput, err error)
 }

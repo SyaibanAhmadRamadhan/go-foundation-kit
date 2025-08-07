@@ -1,4 +1,4 @@
-package libresty
+package restyx
 
 import (
 	"fmt"
