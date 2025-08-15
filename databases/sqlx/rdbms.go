@@ -1,7 +1,8 @@
-package pgxx
+package sqlx
 
 import (
 	"context"
+	"database/sql"
 
 	"github.com/Masterminds/squirrel"
 	"github.com/SyaibanAhmadRamadhan/go-foundation-kit/utils/primitive"
@@ -12,8 +13,8 @@ import (
 // RDBMS is a high-level interface that combines read and write capabilities
 // for interacting with a PostgreSQL database using pgx and Squirrel.
 type RDBMS interface {
-	ReadQuery
-	WriterCommand
+	// ReadQuery
+	// WriterCommand
 	queryExecutor
 }
 
@@ -36,11 +37,11 @@ type WriterCommandSquirrel interface {
 // ReadQuerySquirrel provides read operations using Squirrel's SQL builder.
 type ReadQuerySquirrel interface {
 	// QuerySq executes a SELECT query using Squirrel and returns multiple rows.
-	QuerySq(ctx context.Context, query squirrel.Sqlizer, fn func(rows pgx.Rows) error) error
+	QuerySq(ctx context.Context, query squirrel.Sqlizer) (pgx.Rows, error)
 
 	// QuerySqPagination executes paginated SELECT queries.
-	QuerySqPagination(ctx context.Context, countQuery, query squirrel.SelectBuilder, paginationInput primitive.PaginationInput, fn func(rows pgx.Rows) error) (
-		primitive.PaginationOutput, error)
+	QuerySqPagination(ctx context.Context, countQuery, query squirrel.SelectBuilder, paginationInput primitive.PaginationInput) (
+		pgx.Rows, primitive.PaginationOutput, error)
 
 	// QueryRowSq executes a SELECT query and returns a single row.
 	QueryRowSq(ctx context.Context, query squirrel.Sqlizer) (pgx.Row, error)
@@ -50,13 +51,18 @@ type ReadQuerySquirrel interface {
 // This is useful for situations where Squirrel is not used.
 type queryExecutor interface {
 	// Query executes a SQL string and returns multiple rows.
-	Query(ctx context.Context, sql string, args ...any) (pgx.Rows, error)
+	QueryContext(ctx context.Context, query string, args ...any) (*sql.Rows, error)
+	QueryStmtContext(ctx context.Context, query string, args ...any) (*sql.Rows, error)
 
 	// QueryRow executes a SQL string and returns a single row.
-	QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
+	QueryRowContext(ctx context.Context, query string, args ...any) *sql.Row
+	QueryRowStmtContext(ctx context.Context, query string, args ...any) (*sql.Row, error)
 
 	// Exec executes a SQL command and returns the result tag.
-	Exec(ctx context.Context, sql string, arguments ...any) (pgconn.CommandTag, error)
+	ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error)
+	ExecStmtContext(ctx context.Context, query string, args ...any) (sql.Result, error)
+
+	PrepareContext(ctx context.Context, query string) (*sql.Stmt, error)
 }
 
 // Tx defines transactional operations on the database.
@@ -64,8 +70,7 @@ type queryExecutor interface {
 type Tx interface {
 	// DoTx runs the given function inside a database transaction.
 	// The transaction is committed if the function returns nil, otherwise rolled back.
-	DoTx(ctx context.Context, opt pgx.TxOptions, fn func(tx RDBMS) error) error
 
 	// DoTxContext is a context-aware version of DoTx that also passes the context to the callback.
-	DoTxContext(ctx context.Context, opt pgx.TxOptions, fn func(ctx context.Context, tx RDBMS) (err error)) (err error)
+	DoTxContext(ctx context.Context, opt *sql.TxOptions, fn func(ctx context.Context, tx RDBMS) (err error)) (err error)
 }
