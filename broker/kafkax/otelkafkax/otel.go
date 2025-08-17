@@ -54,7 +54,6 @@ type opentelemetry struct {
 
 	traceAttrs []attribute.KeyValue
 	meterAttrs []attribute.KeyValue
-	spanMap    map[uint64]trace.Span
 }
 
 type openTelemetryConfig struct {
@@ -102,7 +101,6 @@ func NewOtel(opts ...Option) *opentelemetry {
 		propagators: otelConfig.propagators,
 		traceAttrs:  otelConfig.tracerAttrs,
 		meterAttrs:  otelConfig.meterAttrs,
-		spanMap:     make(map[uint64]trace.Span),
 	}
 	o.createMetrics()
 	return o

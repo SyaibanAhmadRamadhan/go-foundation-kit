@@ -102,9 +102,9 @@ func UseHook(h ...DBHook) Option {
 	return optFunc(func(rc *rdbmsConfig) {})
 }
 
-// UseDebugNql is a helper option to attach a DebugHook for logging SQL queries.
+// UseDebug is a helper option to attach a DebugHook for logging SQL queries.
 // If withArgs is true, query arguments will also be logged.
-func UseDebugNql(withArgs bool) Option {
+func UseDebug(withArgs bool) Option {
 	return UseHook(&DebugHook{
 		WithArgs: withArgs,
 	})

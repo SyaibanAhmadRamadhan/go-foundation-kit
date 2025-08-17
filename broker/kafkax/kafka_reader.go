@@ -12,11 +12,11 @@ import (
 // It integrates with OpenTelemetry-compatible Tracer interfaces (KafkaTracerConsume and KafkaTracerCommitMessage)
 // to trace subscription and commit events, and allows automatic unmarshalling of Kafka message values.
 type Reader struct {
-	R             *kafka.Reader            // The underlying kafka.Reader
-	consumeTracer KafkaTracerConsume       // Optional tracer for subscribe lifecycle
-	commitTracer  KafkaTracerCommitMessage // Optional tracer for commit lifecycle
-	groupID       string                   // Kafka consumer group ID
-	unmarshal     UnmarshalFunc            // Function to unmarshal message value into provided struct
+	R             *kafka.Reader       // The underlying kafka.Reader
+	consumeTracer TracerConsume       // Optional tracer for subscribe lifecycle
+	commitTracer  TracerCommitMessage // Optional tracer for commit lifecycle
+	groupID       string              // Kafka consumer group ID
+	unmarshal     UnmarshalFunc       // Function to unmarshal message value into provided struct
 }
 
 // traceAndUnmarshal performs tracing (if enabled) and attempts to unmarshal the Kafka message value
@@ -39,7 +39,7 @@ func (r *Reader) traceAndUnmarshal(ctx context.Context, msg kafka.Message, v any
 	if v != nil {
 		err = r.unmarshal(msg.Value, v)
 		if err != nil {
-			err = errors.Join(err, ErrJsonUnmarshal)
+			err = errors.Join(ErrJsonUnmarshal, err)
 		}
 	}
 	if r.consumeTracer != nil {

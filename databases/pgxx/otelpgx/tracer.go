@@ -40,7 +40,6 @@ const (
 	pgxOperationConnect = "connect"
 	pgxOperationPrepare = "prepare"
 	pgxOperationAcquire = "acquire"
-	pgxOperationBegin   = "begin"
 )
 
 const (
@@ -135,29 +134,6 @@ func NewTracer(opts ...Option) *Tracer {
 	return tracer
 }
 
-// createMetrics initializes all synchronous metrics tracked by Tracer.
-// Any errors encountered upon metric creation will be sent to the globally assigned OpenTelemetry ErrorHandler.
-func (t *Tracer) createMetrics() {
-	var err error
-
-	t.operationDuration, err = t.meter.Int64Histogram(
-		semconv.DBClientOperationDurationName,
-		metric.WithDescription(semconv.DBClientOperationDurationDescription),
-		metric.WithUnit("ms"),
-	)
-	if err != nil {
-		otel.Handle(err)
-	}
-
-	t.operationErrors, err = t.meter.Int64Counter(
-		string(DBClientOperationErrorsKey),
-		metric.WithDescription("The count of database client operation errors"),
-	)
-	if err != nil {
-		otel.Handle(err)
-	}
-}
-
 // recordSpanError handles all error handling to be applied on the provided span.
 // The provided error must be non-nil and not a sql.ErrNoRows error.
 // Otherwise, recordSpanError will be a no-op.
@@ -170,25 +146,6 @@ func recordSpanError(span trace.Span, err error) {
 		if errors.As(err, &pgErr) {
 			span.SetAttributes(SQLStateKey.String(pgErr.Code))
 		}
-	}
-}
-
-// incrementOperationErrorCount will increment the operation error count metric for any provided error
-// that is non-nil and not sql.ErrNoRows. Otherwise, incrementOperationErrorCount becomes a no-op.
-func (t *Tracer) incrementOperationErrorCount(ctx context.Context, err error, pgxOperation string) {
-	if err != nil && !errors.Is(err, sql.ErrNoRows) {
-		t.operationErrors.Add(ctx, 1, metric.WithAttributeSet(
-			attribute.NewSet(append(t.meterAttrs, PGXOperationTypeKey.String(pgxOperation))...),
-		))
-	}
-}
-
-// recordOperationDuration will compute and record the time since the start of an operation.
-func (t *Tracer) recordOperationDuration(ctx context.Context, pgxOperation string) {
-	if startTime, ok := ctx.Value(startTimeCtxKey).(time.Time); ok {
-		t.operationDuration.Record(ctx, time.Since(startTime).Milliseconds(), metric.WithAttributeSet(
-			attribute.NewSet(append(t.meterAttrs, PGXOperationTypeKey.String(pgxOperation))...),
-		))
 	}
 }
 
@@ -510,38 +467,6 @@ func (t *Tracer) TraceAcquireStart(ctx context.Context, pool *pgxpool.Pool, data
 
 	return ctx
 }
-
-// func (t *Tracer) TracerBeginTxStart(ctx context.Context, opt pgx.TxOptions) context.Context {
-// 	ctx = context.WithValue(ctx, startTimeCtxKey, time.Now())
-
-// 	// Selalu buat span baru
-// 	ctx, _ = t.tracer.Start(ctx, "db.tx.begin", trace.WithAttributes(
-// 		attribute.String("db.transaction.iso_level", string(opt.IsoLevel)),
-// 		attribute.String("db.transaction.access_mode", string(opt.AccessMode)),
-// 		attribute.String("db.transaction.deferrable_mode", string(opt.DeferrableMode)),
-// 	))
-
-// 	// Simpan span dalam context
-// 	return ctx
-// }
-
-// func (t *Tracer) TracerBeginTxEnd(ctx context.Context, err error, action string) {
-// 	span := trace.SpanFromContext(ctx)
-// 	if !span.IsRecording() {
-// 		return
-// 	}
-
-// 	recordSpanError(span, err)
-// 	t.incrementOperationErrorCount(ctx, err, pgxOperationBegin)
-
-// 	span.SetAttributes(
-// 		attribute.String("db.transaction.status", action),
-// 	)
-
-// 	t.recordOperationDuration(ctx, pgxOperationBegin)
-
-// 	span.End()
-// }
 
 // TraceAcquireEnd is called when a connection has been acquired.
 func (t *Tracer) TraceAcquireEnd(ctx context.Context, _ *pgxpool.Pool, data pgxpool.TraceAcquireEndData) {

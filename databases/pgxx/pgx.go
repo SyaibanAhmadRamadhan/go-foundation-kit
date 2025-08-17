@@ -13,14 +13,22 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-// rdbms is a PostgreSQL abstraction that implements RDBMS and Tx interfaces using pgx and squirrel.
+// rdbms is a PostgreSQL abstraction that implements RDBMS and Tx
+// interfaces using pgx and Squirrel. It delegates query execution
+// to a pgx connection pool or transaction.
 type rdbms struct {
 	db *pgxpool.Pool
 	queryExecutor
 	isTx bool
 }
 
-// NewRDBMS creates a new instance of rdbms using the given pgx connection pool.
+// NewRDBMS creates a new RDBMS backed by a pgx connection pool.
+//
+// conn should be a PostgreSQL DSN string. Options (opts) can be
+// provided to customize the pgx pool configuration.
+//
+// Returns the RDBMS instance, a cleanup function to close the pool,
+// and an error if initialization fails.
 func NewRDBMS(conn string, opts ...Option) (*rdbms, func(), error) {
 	cfg, err := pgxpool.ParseConfig(conn)
 	if err != nil {
@@ -41,6 +49,8 @@ func NewRDBMS(conn string, opts ...Option) (*rdbms, func(), error) {
 	}, db.Close, nil
 }
 
+// newRDBMSWithExecutor creates a transactional RDBMS that uses the given executor.
+// It is intended for use inside transactions (e.g., pgx.Tx).
 func newRDBMSWithExecutor(db *pgxpool.Pool, executor queryExecutor) *rdbms {
 	return &rdbms{
 		db:            db,
@@ -49,7 +59,11 @@ func newRDBMSWithExecutor(db *pgxpool.Pool, executor queryExecutor) *rdbms {
 	}
 }
 
-// QuerySq executes a SELECT query built with squirrel and returns the result rows.
+// QuerySq executes a SELECT query built with Squirrel and invokes the provided
+// callback with the result rows.
+//
+// The caller must consume rows within fn. Rows are closed automatically
+// after fn returns.
 func (s *rdbms) QuerySq(ctx context.Context, query squirrel.Sqlizer, fn func(rows pgx.Rows) error) error {
 	rawQuery, args, err := query.ToSql()
 	if err != nil {
@@ -62,12 +76,13 @@ func (s *rdbms) QuerySq(ctx context.Context, query squirrel.Sqlizer, fn func(row
 	}
 	defer rows.Close()
 
-	err = fn(rows)
-
-	return err
+	return fn(rows)
 }
 
-// ExecSq executes a write query (INSERT, UPDATE, DELETE) built with squirrel.
+// ExecSq executes a write query (INSERT, UPDATE, DELETE) built with Squirrel.
+//
+// Returns the pgconn.CommandTag, which contains the number of rows affected
+// and command information.
 func (s *rdbms) ExecSq(ctx context.Context, query squirrel.Sqlizer) (pgconn.CommandTag, error) {
 	rawQuery, args, err := query.ToSql()
 	if err != nil {
@@ -76,17 +91,25 @@ func (s *rdbms) ExecSq(ctx context.Context, query squirrel.Sqlizer) (pgconn.Comm
 	return s.Exec(ctx, rawQuery, args...)
 }
 
-// QueryRowSq executes a SELECT query with squirrel and returns a single row.
+// QueryRowSq executes a SELECT query built with Squirrel and returns a single row.
+//
+// Errors from the driver are typically returned when calling Scan on the row.
 func (s *rdbms) QueryRowSq(ctx context.Context, query squirrel.Sqlizer) (pgx.Row, error) {
 	rawQuery, args, err := query.ToSql()
 	if err != nil {
 		return nil, err
 	}
-
 	return s.QueryRow(ctx, rawQuery, args...), nil
 }
 
-// QuerySqPagination executes a paginated SELECT query using squirrel and returns paginated result rows.
+// QuerySqPagination executes a paginated SELECT query built with Squirrel.
+//
+// It uses countQuery to retrieve the total number of records,
+// and query to fetch the paginated subset. paginationInput defines
+// the page and page size. The fn callback is invoked with the paginated rows.
+//
+// Returns a PaginationOutput describing pagination metadata
+// and any error encountered.
 func (s *rdbms) QuerySqPagination(
 	ctx context.Context,
 	countQuery, query squirrel.SelectBuilder,
@@ -111,8 +134,7 @@ func (s *rdbms) QuerySqPagination(
 		return primitive.PaginationOutput{}, err
 	}
 
-	err = s.QuerySq(ctx, query, fn)
-	if err != nil {
+	if err = s.QuerySq(ctx, query, fn); err != nil {
 		return primitive.PaginationOutput{}, err
 	}
 
@@ -120,7 +142,10 @@ func (s *rdbms) QuerySqPagination(
 }
 
 // DoTx executes a function within a database transaction.
-// It commits the transaction if fn returns nil, otherwise rolls it back.
+//
+// If fn returns nil, the transaction is committed. If fn returns
+// an error or a panic occurs, the transaction is rolled back.
+// Any rollback/commit error is joined with the returned error.
 func (s *rdbms) DoTx(ctx context.Context, opt pgx.TxOptions, fn func(tx RDBMS) error) (err error) {
 	if opt.IsoLevel == "" {
 		opt = pgx.TxOptions{
@@ -152,11 +177,15 @@ func (s *rdbms) DoTx(ctx context.Context, opt pgx.TxOptions, fn func(tx RDBMS) e
 	return fn(newRDBMSWithExecutor(s.db, tx))
 }
 
-// DoTxContext is like DoTx but also passes the context to the transactional function.
+// DoTxContext is like DoTx, but passes ctx along to the transactional function.
+//
+// The transaction is committed if fn returns nil. If fn returns an error
+// or a panic occurs, the transaction is rolled back. Any rollback/commit
+// error is joined with the returned error.
 func (s *rdbms) DoTxContext(
 	ctx context.Context,
 	opt pgx.TxOptions,
-	fn func(ctx context.Context, tx RDBMS) (err error),
+	fn func(ctx context.Context, tx RDBMS) error,
 ) (err error) {
 	if opt.IsoLevel == "" {
 		opt = pgx.TxOptions{

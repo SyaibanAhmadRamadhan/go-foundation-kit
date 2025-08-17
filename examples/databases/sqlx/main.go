@@ -31,7 +31,7 @@ func main() {
 		sqlx.WithStmtShardCount(16),
 		sqlx.WithStmtJanitorInterval(15*time.Second),
 		sqlx.WithStmtIdleTTL(20*time.Minute),
-		sqlx.UseDebugNql(true),
+		sqlx.UseDebug(true),
 	)
 
 	ctx := context.Background()

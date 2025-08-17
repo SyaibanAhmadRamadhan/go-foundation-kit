@@ -1,4 +1,4 @@
-//go:generate go tool mockgen -destination=../../.mocking/kafkax_mock.go -package=gofoundationkitmock . KafkaTracerPub,KafkaTracerConsume,KafkaTracerCommitMessage,KafkaPubSub
+//go:generate go tool mockgen -destination=../../.mocking/kafkax_mock/kafkax_mock.go -package=kafkax_mock . TracerPub,TracerConsume,TracerCommitMessage,PubSub
 
 package kafkax
 
@@ -18,7 +18,8 @@ type UnmarshalFunc func([]byte, any) error
 
 // PubInput contains the messages to be published to Kafka.
 type PubInput struct {
-	Messages []kafka.Message
+	KeyWriter string
+	Messages  []kafka.Message
 }
 
 // PubOutput represents the result of a publish operation.
@@ -40,28 +41,28 @@ type SubOutput struct {
 
 // TracerPub is the interface for tracing publish operations.
 // You can implement this to hook into publish start/end spans or logs.
-type KafkaTracerPub interface {
+type TracerPub interface {
 	TracePubStart(ctx context.Context, msg *kafka.Message) context.Context
 	TracePubEnd(ctx context.Context, input PubOutput, err error)
 }
 
 // TracerConsume is the interface for tracing Kafka message consumption.
 // You can use it to track the lifecycle of a consumed message.
-type KafkaTracerConsume interface {
+type TracerConsume interface {
 	TraceConsumeStart(ctx context.Context, groupID string, msg *kafka.Message) context.Context
 	TraceConsumeEnd(ctx context.Context, err error)
 }
 
 // TracerCommitMessage is the interface for tracing Kafka message commits.
 // Useful for acknowledging offsets with observability support.
-type KafkaTracerCommitMessage interface {
+type TracerCommitMessage interface {
 	TraceCommitMessagesStart(ctx context.Context, groupID string, messages ...kafka.Message) []context.Context
 	TraceCommitMessagesEnd(ctx []context.Context, err error)
 }
 
 // PubSub defines a contract for a Kafka publisher-subscriber abstraction.
 // It can be used to send and receive messages from Kafka with optional tracing and decoding.
-type KafkaPubSub interface {
+type PubSub interface {
 	Publish(ctx context.Context, input PubInput) (output PubOutput, err error)
 	Subscribe(ctx context.Context, input SubInput) (output SubOutput, err error)
 }

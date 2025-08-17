@@ -17,13 +17,17 @@ var ErrProcessShutdownIsRunning = errors.New("process shutdown is running")
 var ErrJsonUnmarshal = errors.New("json unmarshal error")
 
 // broker manages Kafka readers and writers, along with optional tracing integrations.
+// It implements the KafkaBroker interface.
 type broker struct {
-	kafkaWriter   *kafka.Writer
-	pubTracer     KafkaTracerPub
-	consumeTracer KafkaTracerConsume
-	commitTracer  KafkaTracerCommitMessage
+	writers       map[string]*kafka.Writer
+	pubTracer     TracerPub
+	consumeTracer TracerConsume
+	commitTracer  TracerCommitMessage
 	readers       []*Reader
 }
+
+// Ensure broker implements KafkaPubSub interface
+var _ PubSub = (*broker)(nil)
 
 // New creates a new broker instance with optional configurations applied via functional options.
 // It also attempts to ping the Kafka writer during initialization.
@@ -32,7 +36,7 @@ type broker struct {
 //   - opts: variadic list of Options to configure the broker
 //
 // Returns:
-//   - *broker: initialized broker instance
+//   - KafkaBroker: initialized broker instance
 func New(opts ...Options) *broker {
 	b := &broker{
 		readers: make([]*Reader, 0),
@@ -44,21 +48,23 @@ func New(opts ...Options) *broker {
 	ctxPing, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	PingKafkaWriter(ctxPing, b.kafkaWriter)
+	PingWriters(ctxPing, b.writers)
 	return b
 }
 
 // Close closes the Kafka writer and all registered readers.
-// Logs any errors encountered during the closing process.
-func (b *broker) Close() {
+// Returns an error if any close operation fails.
+func (b *broker) Close() error {
 	var closeErrs []error
 
-	if b.kafkaWriter != nil {
-		if err := b.kafkaWriter.Close(); err != nil {
-			slog.Error("failed to close kafka writer", slog.Any("error", err))
-			closeErrs = append(closeErrs, fmt.Errorf("writer: %w", err))
-		} else {
-			slog.Info("kafka writer closed successfully")
+	if len(b.writers) <= 0 {
+		for _, writer := range b.writers {
+			if err := writer.Close(); err != nil {
+				slog.Error("failed to close kafka writer", slog.Any("error", err))
+				closeErrs = append(closeErrs, fmt.Errorf("writer: %w", err))
+			} else {
+				slog.Info("kafka writer closed successfully")
+			}
 		}
 	}
 
@@ -76,15 +82,22 @@ func (b *broker) Close() {
 
 	if len(closeErrs) > 0 {
 		slog.Warn("broker close completed with errors", slog.Int("error_count", len(closeErrs)))
-		for _, err := range closeErrs {
-			slog.Warn("close error", slog.Any("error", err))
-		}
-	} else {
-		slog.Info("broker closed cleanly without errors")
+		return fmt.Errorf("multiple close errors: %v", closeErrs)
 	}
+
+	slog.Info("broker closed cleanly without errors")
+	return nil
 }
 
-// PingKafkaBrokers attempts to establish a TCP connection to each Kafka broker address
+func (b *broker) GetWriter(key string) (*kafka.Writer, error) {
+	if w, ok := b.writers[key]; ok {
+		return w, nil
+	}
+
+	return nil, errors.New("unknown writer")
+}
+
+// PingBrokers attempts to establish a TCP connection to each Kafka broker address
 // using the provided Dialer to ensure connectivity.
 //
 // Parameters:
@@ -94,7 +107,7 @@ func (b *broker) Close() {
 //
 // Returns:
 //   - error if any broker cannot be reached
-func PingKafkaBrokers(ctx context.Context, brokers []string, dialer *kafka.Dialer) error {
+func PingBrokers(ctx context.Context, brokers []string, dialer *kafka.Dialer) error {
 	if len(brokers) == 0 {
 		return fmt.Errorf("no Kafka brokers provided")
 	}
@@ -109,7 +122,7 @@ func PingKafkaBrokers(ctx context.Context, brokers []string, dialer *kafka.Diale
 	return nil
 }
 
-// PingKafkaWriter attempts to dial the Kafka writer's broker address to verify availability.
+// PingWriters attempts to dial the Kafka writer's broker address to verify availability.
 //
 // Parameters:
 //   - ctx: context for timeout/cancellation
@@ -117,17 +130,19 @@ func PingKafkaBrokers(ctx context.Context, brokers []string, dialer *kafka.Diale
 //
 // Returns:
 //   - error if the writer is not reachable or dial fails
-func PingKafkaWriter(ctx context.Context, writer *kafka.Writer) error {
-	if writer == nil {
+func PingWriters(ctx context.Context, writers map[string]*kafka.Writer) error {
+	if len(writers) <= 0 {
 		return nil
 	}
 
-	addr := writer.Addr.String()
+	for _, writer := range writers {
+		addr := writer.Addr.String()
 
-	conn, err := kafka.DialContext(ctx, "tcp", addr)
-	if err != nil {
-		return fmt.Errorf("failed to connect to Kafka writer broker %s: %w", addr, err)
+		conn, err := kafka.DialContext(ctx, "tcp", addr)
+		if err != nil {
+			return fmt.Errorf("failed to connect to Kafka writer broker %s: %w", addr, err)
+		}
+		_ = conn.Close()
 	}
-	_ = conn.Close()
 	return nil
 }

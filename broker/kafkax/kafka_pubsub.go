@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 
 	"github.com/segmentio/kafka-go"
 )
@@ -21,12 +22,16 @@ import (
 //   - PubOutput (currently unused)
 //   - error if kafkaWriter is nil or if WriteMessages fails
 func (b *broker) Publish(ctx context.Context, input PubInput) (output PubOutput, err error) {
-	if b.kafkaWriter == nil {
+	writer, err := b.GetWriter(input.KeyWriter)
+	if err != nil {
+		return output, err
+	}
+	if writer == nil {
 		return output, errors.New("kafka writer is not connected")
 	}
 
 	if len(input.Messages) <= 0 {
-		return
+		return output, nil
 	}
 
 	var ctxTracer []context.Context
@@ -36,7 +41,7 @@ func (b *broker) Publish(ctx context.Context, input PubInput) (output PubOutput,
 		}
 	}
 
-	err = b.kafkaWriter.WriteMessages(ctx, input.Messages...)
+	err = writer.WriteMessages(ctx, input.Messages...)
 
 	if b.pubTracer != nil {
 		for _, v := range ctxTracer {
@@ -59,8 +64,18 @@ func (b *broker) Publish(ctx context.Context, input PubInput) (output PubOutput,
 //   - SubOutput containing a pointer to Reader
 //   - error if brokers are unreachable or misconfigured
 func (b *broker) Subscribe(ctx context.Context, input SubInput) (output SubOutput, err error) {
-	if err := PingKafkaBrokers(ctx, input.Config.Brokers, input.Config.Dialer); err != nil {
-		return SubOutput{}, errors.New("unable to connect to kafka brokers: " + err.Error())
+	if len(input.Config.Brokers) == 0 {
+		return SubOutput{}, errors.New("no kafka brokers specified")
+	}
+	if input.Config.Topic == "" {
+		return SubOutput{}, errors.New("kafka topic is required")
+	}
+	if input.Config.GroupID == "" {
+		return SubOutput{}, errors.New("kafka group ID is required")
+	}
+
+	if err := PingBrokers(ctx, input.Config.Brokers, input.Config.Dialer); err != nil {
+		return SubOutput{}, fmt.Errorf("unable to connect to kafka brokers: %w", err)
 	}
 
 	reader := kafka.NewReader(input.Config)

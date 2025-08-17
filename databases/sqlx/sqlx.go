@@ -23,6 +23,9 @@ type rdbmsConfig struct {
 	hooks      []DBHook
 }
 
+// NewRDBMS constructs an RDBMS instance on top of *sql.DB with an internal
+// prepared-statement cache and optional hooks for instrumentation.
+// The stmt cache runs a background janitor if janIntv > 0 (using cfg.ctx).
 func NewRDBMS(db *sql.DB, opts ...Option) *rdbms {
 	cfg := defaultConfig()
 	for _, o := range opts {
@@ -55,38 +58,9 @@ func NewRDBMS(db *sql.DB, opts ...Option) *rdbms {
 	}
 }
 
-func (r *rdbms) QueryStmtContext(ctx context.Context, query string, args ...any) (*sql.Rows, error) {
-	info := &HookInfo{
-		Op:       OpQuery,
-		SQL:      query,
-		Args:     args,
-		InTx:     r.tx != nil,
-		Prepared: true,
-		Start:    time.Now(),
-	}
-	ctx = r.callBefore(ctx, info)
-
-	e, err := r.sc.getOrPrepare(ctx, r, query)
-	if err != nil {
-		info.Err = err
-		info.End = time.Now()
-		r.callAfter(ctx, info)
-		return nil, err
-	}
-	defer r.sc.put(e)
-
-	var rows *sql.Rows
-	if r.tx != nil {
-		rows, err = r.tx.StmtContext(ctx, e.stmt).QueryContext(ctx, args...)
-	} else {
-		rows, err = e.stmt.QueryContext(ctx, args...)
-	}
-	info.Err = err
-	info.End = time.Now()
-	r.callAfter(ctx, info)
-	return rows, err
-}
-
+// QueryContext executes a query that returns rows, typically a SELECT.
+// If r is inside a transaction, it uses that tx; otherwise it uses the base *sql.DB.
+// Hook timing and error are recorded in HookInfo (OpQuery).
 func (r *rdbms) QueryContext(ctx context.Context, query string, args ...any) (*sql.Rows, error) {
 	info := &HookInfo{
 		Op:       OpQuery,
@@ -113,31 +87,9 @@ func (r *rdbms) QueryContext(ctx context.Context, query string, args ...any) (*s
 	return rows, err
 }
 
-func (r *rdbms) QueryRowStmtContext(ctx context.Context, query string, args ...any) (*sql.Row, error) {
-	info := &HookInfo{
-		Op:       OpQueryRow,
-		SQL:      query,
-		Args:     args,
-		InTx:     r.tx != nil,
-		Prepared: true,
-		Start:    time.Now(),
-	}
-	ctx = r.callBefore(ctx, info)
-	defer func() { info.End = time.Now(); r.callAfter(ctx, info) }()
-
-	e, err := r.sc.getOrPrepare(ctx, r, query)
-	if err != nil {
-		info.Err = err
-		return nil, err
-	}
-	defer r.sc.put(e)
-
-	if r.tx != nil {
-		return r.tx.StmtContext(ctx, e.stmt).QueryRowContext(ctx, args...), nil
-	}
-	return e.stmt.QueryRowContext(ctx, args...), nil
-}
-
+// QueryRowContext executes a query that is expected to return at most one row.
+// Errors from the underlying driver are usually reported at Scan time on the returned *sql.Row.
+// Hook timing is recorded (OpQueryRow). Any immediate driver error will be set on HookInfo.Err.
 func (r *rdbms) QueryRowContext(ctx context.Context, query string, args ...any) *sql.Row {
 	info := &HookInfo{
 		Op:       OpQueryRow,
@@ -156,43 +108,9 @@ func (r *rdbms) QueryRowContext(ctx context.Context, query string, args ...any) 
 	return r.db.QueryRowContext(ctx, query, args...)
 }
 
-func (r *rdbms) ExecStmtContext(ctx context.Context, query string, args ...any) (sql.Result, error) {
-	info := &HookInfo{
-		Op:       OpExec,
-		SQL:      query,
-		Args:     args,
-		InTx:     r.tx != nil,
-		Prepared: true,
-		Start:    time.Now(),
-	}
-	ctx = r.callBefore(ctx, info)
-	defer func() { info.End = time.Now(); r.callAfter(ctx, info) }()
-
-	e, err := r.sc.getOrPrepare(ctx, r, query)
-	if err != nil {
-		info.Err = err
-		return nil, err
-	}
-	defer r.sc.put(e)
-
-	var res sql.Result
-	if r.tx != nil {
-		res, err = r.tx.StmtContext(ctx, e.stmt).ExecContext(ctx, args...)
-	} else {
-		res, err = e.stmt.ExecContext(ctx, args...)
-	}
-	if err != nil {
-		info.Err = err
-		return nil, err
-	}
-
-	if ra, e2 := res.RowsAffected(); e2 == nil {
-		v := ra
-		info.Rows = &v
-	}
-	return res, nil
-}
-
+// ExecContext executes a statement that does not return rows (INSERT/UPDATE/DELETE/DDL).
+// If inside a transaction, the tx is used; otherwise the base *sql.DB is used.
+// Hook timing and RowsAffected (if available) are recorded (OpExec).
 func (r *rdbms) ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error) {
 	info := &HookInfo{
 		Op:       OpExec,
@@ -219,6 +137,7 @@ func (r *rdbms) ExecContext(ctx context.Context, query string, args ...any) (sql
 		return nil, err
 	}
 
+	// Not all drivers support RowsAffected (e.g., some DDL). Ignore error if not supported.
 	if ra, e2 := res.RowsAffected(); e2 == nil {
 		v := ra
 		info.Rows = &v
@@ -226,6 +145,10 @@ func (r *rdbms) ExecContext(ctx context.Context, query string, args ...any) (sql
 	return res, nil
 }
 
+// PrepareContext creates a prepared statement on the base *sql.DB.
+// NOTE: The tx-bound variant is commented out—if you want statements bound to the
+// current transaction, you may switch to r.tx.PrepareContext when r.tx != nil.
+// Hook timing and error are recorded (OpPrepare).
 func (r *rdbms) PrepareContext(ctx context.Context, query string) (*sql.Stmt, error) {
 	info := &HookInfo{
 		Op:    OpPrepare,
@@ -236,6 +159,7 @@ func (r *rdbms) PrepareContext(ctx context.Context, query string) (*sql.Stmt, er
 	ctx = r.callBefore(ctx, info)
 	defer func() { info.End = time.Now(); r.callAfter(ctx, info) }()
 
+	// If you need tx-scoped prepared statements, uncomment:
 	// if r.tx != nil {
 	// 	st, err := r.tx.PrepareContext(ctx, query)
 	// 	info.Err = err
@@ -246,15 +170,26 @@ func (r *rdbms) PrepareContext(ctx context.Context, query string) (*sql.Stmt, er
 	return st, err
 }
 
+// DoTxContext runs fn within a database transaction.
+// If r is already inside a transaction, fn is executed using the current receiver (no new tx).
+// Otherwise, a child rdbms with tx-bound context is created. Commit/rollback events are
+// surfaced via hooks (OpTxBegin, OpTxCommit, OpTxRollback).
+//
+// Behavior:
+//   - Panic inside fn: transaction is rolled back, then panic is rethrown.
+//   - fn returns error: transaction is rolled back, error is returned.
+//   - fn returns nil: transaction is committed; commit error (if any) is returned.
 func (r *rdbms) DoTxContext(ctx context.Context, opt *sql.TxOptions, fn func(ctx context.Context, tx RDBMS) error) (err error) {
 	if ctx == nil {
 		ctx = context.Background()
 	}
 
+	// Already inside a transaction: run on the same receiver (nested logical tx, single physical tx).
 	if r.tx != nil {
 		return fn(ctx, r)
 	}
 
+	// Begin
 	beg := &HookInfo{
 		Op:    OpTxBegin,
 		Start: time.Now(),
@@ -267,6 +202,7 @@ func (r *rdbms) DoTxContext(ctx context.Context, opt *sql.TxOptions, fn func(ctx
 		return err
 	}
 
+	// Child context bound to this tx
 	child := &rdbms{db: r.db, sc: r.sc, tx: tx, hooks: r.hooks}
 
 	defer func() {
@@ -291,6 +227,8 @@ func (r *rdbms) DoTxContext(ctx context.Context, opt *sql.TxOptions, fn func(ctx
 	return fn(ctx, child)
 }
 
+// callBefore executes all registered DBHook.Before in order, threading context through.
+// Any hook may enrich the context (e.g., tracing IDs, timeouts).
 func (r *rdbms) callBefore(ctx context.Context, info *HookInfo) context.Context {
 	for _, h := range r.hooks {
 		ctx = h.Before(ctx, info)
@@ -298,6 +236,8 @@ func (r *rdbms) callBefore(ctx context.Context, info *HookInfo) context.Context 
 	return ctx
 }
 
+// callAfter executes all registered DBHook.After in order.
+// Hooks should be non-blocking and panic-safe at implementation site.
 func (r *rdbms) callAfter(ctx context.Context, info *HookInfo) {
 	for _, h := range r.hooks {
 		h.After(ctx, info)
