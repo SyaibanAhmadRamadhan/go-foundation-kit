@@ -227,6 +227,12 @@ func (r *rdbms) DoTxContext(ctx context.Context, opt *sql.TxOptions, fn func(ctx
 	return fn(ctx, child)
 }
 
+// Close releases all cached statements across all shards and close db.
+func (c *rdbms) Close() error {
+	c.sc.close()
+	return c.db.Close()
+}
+
 // callBefore executes all registered DBHook.Before in order, threading context through.
 // Any hook may enrich the context (e.g., tracing IDs, timeouts).
 func (r *rdbms) callBefore(ctx context.Context, info *HookInfo) context.Context {

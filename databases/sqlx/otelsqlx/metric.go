@@ -46,10 +46,8 @@ func (t *Tracer) incrementOperationErrorCount(ctx context.Context, err error, op
 }
 
 // recordOperationDuration will compute and record the time since the start of an operation.
-func (t *Tracer) recordOperationDuration(ctx context.Context, operation string) {
-	if startTime, ok := ctx.Value(startTimeCtxKey).(time.Time); ok {
-		t.operationDuration.Record(ctx, time.Since(startTime).Milliseconds(), metric.WithAttributeSet(
-			attribute.NewSet(append(t.meterAttrs, OperationTypeKey.String(operation))...),
-		))
-	}
+func (t *Tracer) recordOperationDuration(ctx context.Context, operation string, startTime time.Time) {
+	t.operationDuration.Record(ctx, time.Since(startTime).Milliseconds(), metric.WithAttributeSet(
+		attribute.NewSet(append(t.meterAttrs, OperationTypeKey.String(operation))...),
+	))
 }

@@ -16,7 +16,7 @@ import (
 // metricBuilder provides a fluent API for constructing and initializing
 // an OpenTelemetry MeterProvider with various configurations.
 type metricBuilder struct {
-	exporter           *otlpmetricgrpc.Exporter
+	exporter           sdkmetric.Exporter
 	resource           *resource.Resource
 	reader             sdkmetric.Reader
 	view               sdkmetric.View
@@ -32,7 +32,7 @@ func NewMetric() *metricBuilder {
 }
 
 // WithExporter sets a pre-initialized OTLP metric exporter.
-func (m *metricBuilder) WithExporter(e *otlpmetricgrpc.Exporter) *metricBuilder {
+func (m *metricBuilder) WithExporter(e sdkmetric.Exporter) *metricBuilder {
 	m.exporter = e
 	return m
 }
@@ -62,7 +62,7 @@ func (m *metricBuilder) WithGlobalMetricProvider() *metricBuilder {
 }
 
 // Exporter returns the underlying exporter instance, useful for shutdown handling.
-func (m *metricBuilder) Exporter() *otlpmetricgrpc.Exporter {
+func (m *metricBuilder) Exporter() sdkmetric.Exporter {
 	return m.exporter
 }
 

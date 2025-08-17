@@ -26,11 +26,13 @@ import (
 	"go.opentelemetry.io/otel/trace"
 )
 
+type ctxKey string
+
 const (
-	tracerName          = "github.com/SyaibanAhmadRamadhan/go-foundation-kit/databases/pgxx/otelpgx"
-	meterName           = "github.com/SyaibanAhmadRamadhan/go-foundation-kit/databases/pgxx/otelpgx"
-	startTimeCtxKey     = "otelpgxStartTime"
-	sqlOperationUnknown = "UNKNOWN"
+	tracerName                 = "github.com/SyaibanAhmadRamadhan/go-foundation-kit/databases/pgxx/otelpgx"
+	meterName                  = "github.com/SyaibanAhmadRamadhan/go-foundation-kit/databases/pgxx/otelpgx"
+	startTimeCtxKey     ctxKey = "otelpgxStartTime"
+	sqlOperationUnknown        = "UNKNOWN"
 )
 
 const (
@@ -118,15 +120,16 @@ func NewTracer(opts ...Option) *Tracer {
 	}
 
 	tracer := &Tracer{
-		tracer:              cfg.tracerProvider.Tracer(tracerName, trace.WithInstrumentationVersion(findOwnImportedVersion())),
-		meter:               cfg.meterProvider.Meter(meterName, metric.WithInstrumentationVersion(findOwnImportedVersion())),
-		tracerAttrs:         cfg.tracerAttrs,
-		meterAttrs:          cfg.meterAttrs,
-		trimQuerySpanName:   cfg.trimQuerySpanName,
-		spanNameFunc:        cfg.spanNameFunc,
-		prefixQuerySpanName: cfg.prefixQuerySpanName,
-		logSQLStatement:     cfg.logSQLStatement,
-		includeParams:       cfg.includeParams,
+		tracer:               cfg.tracerProvider.Tracer(tracerName, trace.WithInstrumentationVersion(findOwnImportedVersion())),
+		meter:                cfg.meterProvider.Meter(meterName, metric.WithInstrumentationVersion(findOwnImportedVersion())),
+		tracerAttrs:          cfg.tracerAttrs,
+		meterAttrs:           cfg.meterAttrs,
+		trimQuerySpanName:    cfg.trimQuerySpanName,
+		spanNameFunc:         cfg.spanNameFunc,
+		prefixQuerySpanName:  cfg.prefixQuerySpanName,
+		logSQLStatement:      cfg.logSQLStatement,
+		includeParams:        cfg.includeParams,
+		logConnectionDetails: cfg.logConnectionDetails,
 	}
 
 	tracer.createMetrics()

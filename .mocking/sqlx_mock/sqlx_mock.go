@@ -17,8 +17,6 @@ import (
 	squirrel "github.com/Masterminds/squirrel"
 	sqlx "github.com/SyaibanAhmadRamadhan/go-foundation-kit/databases/sqlx"
 	primitive "github.com/SyaibanAhmadRamadhan/go-foundation-kit/utils/primitive"
-	pgx "github.com/jackc/pgx/v5"
-	pgconn "github.com/jackc/pgx/v5/pgconn"
 	gomock "go.uber.org/mock/gomock"
 )
 
@@ -64,6 +62,21 @@ func (mr *MockRDBMSMockRecorder) ExecContext(ctx, query any, args ...any) *gomoc
 	mr.mock.ctrl.T.Helper()
 	varargs := append([]any{ctx, query}, args...)
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ExecContext", reflect.TypeOf((*MockRDBMS)(nil).ExecContext), varargs...)
+}
+
+// ExecSq mocks base method.
+func (m *MockRDBMS) ExecSq(ctx context.Context, query squirrel.Sqlizer, useStmt bool) (sql.Result, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ExecSq", ctx, query, useStmt)
+	ret0, _ := ret[0].(sql.Result)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ExecSq indicates an expected call of ExecSq.
+func (mr *MockRDBMSMockRecorder) ExecSq(ctx, query, useStmt any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ExecSq", reflect.TypeOf((*MockRDBMS)(nil).ExecSq), ctx, query, useStmt)
 }
 
 // ExecStmtContext mocks base method.
@@ -140,6 +153,21 @@ func (mr *MockRDBMSMockRecorder) QueryRowContext(ctx, query any, args ...any) *g
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "QueryRowContext", reflect.TypeOf((*MockRDBMS)(nil).QueryRowContext), varargs...)
 }
 
+// QueryRowSq mocks base method.
+func (m *MockRDBMS) QueryRowSq(ctx context.Context, query squirrel.Sqlizer, useStmt bool) (*sql.Row, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "QueryRowSq", ctx, query, useStmt)
+	ret0, _ := ret[0].(*sql.Row)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// QueryRowSq indicates an expected call of QueryRowSq.
+func (mr *MockRDBMSMockRecorder) QueryRowSq(ctx, query, useStmt any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "QueryRowSq", reflect.TypeOf((*MockRDBMS)(nil).QueryRowSq), ctx, query, useStmt)
+}
+
 // QueryRowStmtContext mocks base method.
 func (m *MockRDBMS) QueryRowStmtContext(ctx context.Context, query string, args ...any) (*sql.Row, error) {
 	m.ctrl.T.Helper()
@@ -158,6 +186,35 @@ func (mr *MockRDBMSMockRecorder) QueryRowStmtContext(ctx, query any, args ...any
 	mr.mock.ctrl.T.Helper()
 	varargs := append([]any{ctx, query}, args...)
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "QueryRowStmtContext", reflect.TypeOf((*MockRDBMS)(nil).QueryRowStmtContext), varargs...)
+}
+
+// QuerySq mocks base method.
+func (m *MockRDBMS) QuerySq(ctx context.Context, query squirrel.Sqlizer, useStmt bool, fn func(*sql.Rows) error) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "QuerySq", ctx, query, useStmt, fn)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// QuerySq indicates an expected call of QuerySq.
+func (mr *MockRDBMSMockRecorder) QuerySq(ctx, query, useStmt, fn any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "QuerySq", reflect.TypeOf((*MockRDBMS)(nil).QuerySq), ctx, query, useStmt, fn)
+}
+
+// QuerySqPagination mocks base method.
+func (m *MockRDBMS) QuerySqPagination(ctx context.Context, countQuery, query squirrel.SelectBuilder, useStmt bool, paginationInput primitive.PaginationInput, fn func(*sql.Rows) error) (primitive.PaginationOutput, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "QuerySqPagination", ctx, countQuery, query, useStmt, paginationInput, fn)
+	ret0, _ := ret[0].(primitive.PaginationOutput)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// QuerySqPagination indicates an expected call of QuerySqPagination.
+func (mr *MockRDBMSMockRecorder) QuerySqPagination(ctx, countQuery, query, useStmt, paginationInput, fn any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "QuerySqPagination", reflect.TypeOf((*MockRDBMS)(nil).QuerySqPagination), ctx, countQuery, query, useStmt, paginationInput, fn)
 }
 
 // QueryStmtContext mocks base method.
@@ -205,49 +262,47 @@ func (m *MockReadQuery) EXPECT() *MockReadQueryMockRecorder {
 }
 
 // QueryRowSq mocks base method.
-func (m *MockReadQuery) QueryRowSq(ctx context.Context, query squirrel.Sqlizer) (pgx.Row, error) {
+func (m *MockReadQuery) QueryRowSq(ctx context.Context, query squirrel.Sqlizer, useStmt bool) (*sql.Row, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "QueryRowSq", ctx, query)
-	ret0, _ := ret[0].(pgx.Row)
+	ret := m.ctrl.Call(m, "QueryRowSq", ctx, query, useStmt)
+	ret0, _ := ret[0].(*sql.Row)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // QueryRowSq indicates an expected call of QueryRowSq.
-func (mr *MockReadQueryMockRecorder) QueryRowSq(ctx, query any) *gomock.Call {
+func (mr *MockReadQueryMockRecorder) QueryRowSq(ctx, query, useStmt any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "QueryRowSq", reflect.TypeOf((*MockReadQuery)(nil).QueryRowSq), ctx, query)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "QueryRowSq", reflect.TypeOf((*MockReadQuery)(nil).QueryRowSq), ctx, query, useStmt)
 }
 
 // QuerySq mocks base method.
-func (m *MockReadQuery) QuerySq(ctx context.Context, query squirrel.Sqlizer) (pgx.Rows, error) {
+func (m *MockReadQuery) QuerySq(ctx context.Context, query squirrel.Sqlizer, useStmt bool, fn func(*sql.Rows) error) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "QuerySq", ctx, query)
-	ret0, _ := ret[0].(pgx.Rows)
+	ret := m.ctrl.Call(m, "QuerySq", ctx, query, useStmt, fn)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// QuerySq indicates an expected call of QuerySq.
+func (mr *MockReadQueryMockRecorder) QuerySq(ctx, query, useStmt, fn any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "QuerySq", reflect.TypeOf((*MockReadQuery)(nil).QuerySq), ctx, query, useStmt, fn)
+}
+
+// QuerySqPagination mocks base method.
+func (m *MockReadQuery) QuerySqPagination(ctx context.Context, countQuery, query squirrel.SelectBuilder, useStmt bool, paginationInput primitive.PaginationInput, fn func(*sql.Rows) error) (primitive.PaginationOutput, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "QuerySqPagination", ctx, countQuery, query, useStmt, paginationInput, fn)
+	ret0, _ := ret[0].(primitive.PaginationOutput)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// QuerySq indicates an expected call of QuerySq.
-func (mr *MockReadQueryMockRecorder) QuerySq(ctx, query any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "QuerySq", reflect.TypeOf((*MockReadQuery)(nil).QuerySq), ctx, query)
-}
-
-// QuerySqPagination mocks base method.
-func (m *MockReadQuery) QuerySqPagination(ctx context.Context, countQuery, query squirrel.SelectBuilder, paginationInput primitive.PaginationInput) (pgx.Rows, primitive.PaginationOutput, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "QuerySqPagination", ctx, countQuery, query, paginationInput)
-	ret0, _ := ret[0].(pgx.Rows)
-	ret1, _ := ret[1].(primitive.PaginationOutput)
-	ret2, _ := ret[2].(error)
-	return ret0, ret1, ret2
-}
-
 // QuerySqPagination indicates an expected call of QuerySqPagination.
-func (mr *MockReadQueryMockRecorder) QuerySqPagination(ctx, countQuery, query, paginationInput any) *gomock.Call {
+func (mr *MockReadQueryMockRecorder) QuerySqPagination(ctx, countQuery, query, useStmt, paginationInput, fn any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "QuerySqPagination", reflect.TypeOf((*MockReadQuery)(nil).QuerySqPagination), ctx, countQuery, query, paginationInput)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "QuerySqPagination", reflect.TypeOf((*MockReadQuery)(nil).QuerySqPagination), ctx, countQuery, query, useStmt, paginationInput, fn)
 }
 
 // MockWriterCommand is a mock of WriterCommand interface.
@@ -275,18 +330,18 @@ func (m *MockWriterCommand) EXPECT() *MockWriterCommandMockRecorder {
 }
 
 // ExecSq mocks base method.
-func (m *MockWriterCommand) ExecSq(ctx context.Context, query squirrel.Sqlizer) (pgconn.CommandTag, error) {
+func (m *MockWriterCommand) ExecSq(ctx context.Context, query squirrel.Sqlizer, useStmt bool) (sql.Result, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ExecSq", ctx, query)
-	ret0, _ := ret[0].(pgconn.CommandTag)
+	ret := m.ctrl.Call(m, "ExecSq", ctx, query, useStmt)
+	ret0, _ := ret[0].(sql.Result)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // ExecSq indicates an expected call of ExecSq.
-func (mr *MockWriterCommandMockRecorder) ExecSq(ctx, query any) *gomock.Call {
+func (mr *MockWriterCommandMockRecorder) ExecSq(ctx, query, useStmt any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ExecSq", reflect.TypeOf((*MockWriterCommand)(nil).ExecSq), ctx, query)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ExecSq", reflect.TypeOf((*MockWriterCommand)(nil).ExecSq), ctx, query, useStmt)
 }
 
 // MockTx is a mock of Tx interface.

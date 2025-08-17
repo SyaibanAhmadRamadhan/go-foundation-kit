@@ -185,7 +185,7 @@ func (c *stmtCache) runJanitor(ctx context.Context) {
 	for {
 		select {
 		case <-ctx.Done():
-			c.close()
+			// c.close()
 			return
 		case <-t.C:
 			for i := range c.shards {
@@ -221,7 +221,6 @@ func (c *stmtCache) runJanitor(ctx context.Context) {
 }
 
 // Close releases all cached statements across all shards.
-// Dipanggil ketika ctx.Done() agar tidak ada prepared stmt yang leak.
 func (c *stmtCache) close() {
 	for i := range c.shards {
 		s := &c.shards[i]
