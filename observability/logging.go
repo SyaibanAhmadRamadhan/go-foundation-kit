@@ -14,11 +14,12 @@ import (
 
 // LogConfig contains configuration options for setting up structured logging.
 type LogConfig struct {
-	Hook        io.Writer // Optional log sink (e.g., Kafka writer). If nil, logs won't be sent to external sinks.
-	Mode        string    // Output format: "text" or "json" for slog.
-	Level       string    // Log level: "info", "debug", "warn", "error", etc.
-	Env         string    // Environment name: "production", "staging", "development", etc.
-	ServiceName string    // The name of the service emitting the logs.
+	Hook          io.Writer // Optional log sink (e.g., Kafka writer). If nil, logs won't be sent to external sinks.
+	Mode          string    // Output format: "text" or "json" for slog.
+	Level         string    // Log level: "info", "debug", "warn", "error", etc.
+	Env           string    // Environment name: "production", "staging", "development", etc.
+	ServiceName   string    // The name of the service emitting the logs.
+	ZerologStdOut bool
 }
 
 // NewLog initializes slog and zerolog based on the provided configuration.
@@ -37,11 +38,20 @@ func NewLog(cfg LogConfig) {
 		slog.String("level", cfg.Level),
 	)
 
+	hooks := make([]io.Writer, 0)
+	if cfg.ZerologStdOut {
+		hooks = append(hooks, os.Stdout)
+	}
 	if cfg.Hook != nil {
+		hooks = append(hooks, cfg.Hook)
+	}
+
+	if len(hooks) > 0 {
+		mw := zerolog.MultiLevelWriter(hooks...)
 		zerolog.TimeFieldFormat = zerolog.TimeFormatUnix
 		zerologLevel := parseZerologLevel(cfg.Level)
 
-		zlogger := zerolog.New(cfg.Hook).Level(zerologLevel).With().
+		zlogger := zerolog.New(mw).Level(zerologLevel).With().
 			Timestamp().
 			Str("env", cfg.Env).
 			Str("service_name", cfg.ServiceName).
