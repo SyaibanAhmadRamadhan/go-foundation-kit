@@ -22,6 +22,15 @@ func (cv *ginValidatorCustom) Engine() any {
 	return cv.validator
 }
 
+type NoopValidator struct{}
+
+func (NoopValidator) ValidateStruct(any) error {
+	return nil // selalu sukses
+}
+func (NoopValidator) Engine() any {
+	return nil
+}
+
 // GinConfig contains configuration for setting up a new Gin engine with
 // OpenTelemetry middleware, custom validator, logging, CORS, etc.
 type GinConfig struct {
@@ -38,9 +47,7 @@ type GinConfig struct {
 func NewGin(conf GinConfig) *gin.Engine {
 	router := gin.Default()
 
-	ginValidator := &ginValidatorCustom{
-		validator: conf.Validator,
-	}
+	ginValidator := &NoopValidator{}
 	binding.Validator = ginValidator
 
 	router.Use(gin.Recovery())

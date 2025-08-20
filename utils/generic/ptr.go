@@ -49,3 +49,15 @@ func Ternary[T any](condition bool, ifTrue, ifFalse T) T {
 	}
 	return ifFalse
 }
+
+func ToPtr[T any](v T) *T {
+	return &v
+}
+
+func FromPtr[T any](p *T) T {
+	if p == nil {
+		var zero T
+		return zero
+	}
+	return *p
+}

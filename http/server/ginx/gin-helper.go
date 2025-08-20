@@ -8,29 +8,53 @@ import (
 
 	"github.com/SyaibanAhmadRamadhan/go-foundation-kit/apperror"
 	"github.com/SyaibanAhmadRamadhan/go-foundation-kit/utils/primitive"
-	"github.com/SyaibanAhmadRamadhan/go-foundation-kit/validator"
+	"github.com/SyaibanAhmadRamadhan/go-foundation-kit/validatorx"
 	"github.com/gin-gonic/gin"
+	"github.com/go-playground/validator/v10"
 )
 
 // MustShouldBind attempts to bind the request payload to the given struct.
-// If validation fails, it returns a 400 response with validation errors.
-// Otherwise, it returns a 422 with the raw error.
+// - If validation fails (validator.v10), it returns 400 with structured errors.
+// - If binding/parsing fails (JSON/form decode, type mismatch, etc.), it returns 422 with the raw error.
+// Returns false if response is already written; true if everything is OK.
 func MustShouldBind(c *gin.Context, req any) bool {
 	if err := c.ShouldBind(req); err != nil {
 		c.Error(err)
-		validationErr := validator.ParseValidationErrors(err)
-		if len(validationErr) > 0 {
+
+		var verr validator.ValidationErrors
+		if errors.As(err, &verr) {
 			c.JSON(http.StatusBadRequest, map[string]any{
 				"message":           "Validation error",
-				"error_validations": validationErr,
+				"error_validations": validatorx.ParseValidationErrors(verr),
 			})
 			return false
 		}
-		c.JSON(http.StatusUnprocessableEntity, map[string]string{
+
+		c.JSON(http.StatusUnprocessableEntity, map[string]any{
 			"message": err.Error(),
 		})
 		return false
 	}
+
+	if err := validatorx.Validate.StructCtx(c.Request.Context(), req); err != nil {
+		c.Error(err)
+
+		var verr validator.ValidationErrors
+		if errors.As(err, &verr) {
+			c.JSON(http.StatusBadRequest, map[string]any{
+				"message":           "Validation error",
+				"error_validations": validatorx.ParseValidationErrors(verr),
+			})
+			return false
+		}
+
+		// error lain saat validasi (jarang, tapi jaga-jaga)
+		c.JSON(http.StatusUnprocessableEntity, map[string]any{
+			"message": err.Error(),
+		})
+		return false
+	}
+
 	return true
 }
 
