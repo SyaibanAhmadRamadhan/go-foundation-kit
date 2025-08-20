@@ -90,7 +90,10 @@ func (r *rdbms) QuerySqPagination(
 	paginationInput primitive.PaginationInput,
 	fn func(rows *sql.Rows) error,
 ) (primitive.PaginationOutput, error) {
-	query = query.Limit(uint64(paginationInput.PageSize)).Offset(uint64(paginationInput.Page))
+	query = query.Limit(uint64(paginationInput.PageSize)).Offset(uint64(primitive.GetOffsetValue(
+		paginationInput.Page,
+		paginationInput.PageSize,
+	)))
 	q, args, err := query.ToSql()
 	if err != nil {
 		return primitive.PaginationOutput{}, fmt.Errorf("failed parse squirrel: %w", err)
