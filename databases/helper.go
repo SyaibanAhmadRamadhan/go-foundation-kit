@@ -1,6 +1,7 @@
 package databases
 
 import (
+	"bytes"
 	"regexp"
 	"strings"
 )
@@ -17,4 +18,8 @@ func NormalizeSQL(sql string) string {
 	s = strings.TrimSpace(s)
 	s = spaceRe.ReplaceAllString(s, " ")
 	return s
+}
+
+func IsNullLiteral(b []byte) bool {
+	return bytes.Equal(b, []byte("null")) || bytes.Equal(b, []byte("NULL"))
 }
