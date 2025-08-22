@@ -3,7 +3,7 @@ package main
 import (
 	"fmt"
 
-	"github.com/SyaibanAhmadRamadhan/go-foundation-kit/confy"
+	"github.com/SyaibanAhmadRamadhan/go-foundation-kit/confy/envfileloader"
 )
 
 type Conf struct {
@@ -17,7 +17,7 @@ type ConfDB struct {
 	Password string `env:"password"`
 }
 
-var loader *confy.Loader[Conf]
+var loader *envfileloader.Loader[Conf]
 
 func GetConf() *Conf {
 	if loader == nil {
@@ -48,13 +48,13 @@ func loadConfig() {
 		fmt.Printf("[WATCH] reloaded: name=%s env=%s db.user=%s\n", c.Name, c.Env, c.DB.Username)
 	}
 	var err error
-	loader, err = confy.New(fnForOnChangeWatch,
+	loader, err = envfileloader.New(fnForOnChangeWatch,
 		// config
-		confy.WithDelimiter("."),
-		confy.WithFileType("json"),
-		confy.WithTag("env"),
-		confy.WithFiles(cfgPath),
-		confy.WithWatch(true),
+		envfileloader.WithDelimiter("."),
+		envfileloader.WithFileType("json"),
+		envfileloader.WithTag("env"),
+		envfileloader.WithFiles(cfgPath),
+		envfileloader.WithWatch(true),
 	)
 	if err != nil {
 		panic(err)
@@ -76,13 +76,13 @@ func loadConfigWithOutCallback() {
 }`)
 
 	var err error
-	loader, err = confy.New[Conf](nil,
+	loader, err = envfileloader.New[Conf](nil,
 		// config
-		confy.WithDelimiter("."),
-		confy.WithFileType("json"),
-		confy.WithTag("env"),
-		confy.WithFiles(cfgPath),
-		confy.WithWatch(true),
+		envfileloader.WithDelimiter("."),
+		envfileloader.WithFileType("json"),
+		envfileloader.WithTag("env"),
+		envfileloader.WithFiles(cfgPath),
+		envfileloader.WithWatch(true),
 	)
 	if err != nil {
 		panic(err)
@@ -115,14 +115,14 @@ func loadConfigWithCallbackWhenKeyIsTrue() {
 		fmt.Printf("[WATCH] reloaded: name=%s env=%s db.user=%s\n", c.Name, c.Env, c.DB.Username)
 	}
 	var err error
-	loader, err = confy.New(fnForOnChangeWatch,
+	loader, err = envfileloader.New(fnForOnChangeWatch,
 		// config
-		confy.WithDelimiter("."),
-		confy.WithFileType("json"),
-		confy.WithTag("env"),
-		confy.WithFiles(cfgPath),
-		confy.WithWatch(true),
-		confy.WithCallbackOnChangeWhenOnKeyTrue("log_env"),
+		envfileloader.WithDelimiter("."),
+		envfileloader.WithFileType("json"),
+		envfileloader.WithTag("env"),
+		envfileloader.WithFiles(cfgPath),
+		envfileloader.WithWatch(true),
+		envfileloader.WithCallbackOnChangeWhenOnKeyTrue("log_env"),
 	)
 	if err != nil {
 		panic(err)

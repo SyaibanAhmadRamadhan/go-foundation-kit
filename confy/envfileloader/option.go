@@ -1,4 +1,4 @@
-package confy
+package envfileloader
 
 import "strings"
 

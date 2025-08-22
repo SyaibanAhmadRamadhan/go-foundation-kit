@@ -1,4 +1,4 @@
-package confy
+package envfileloader
 
 import (
 	"context"
@@ -9,11 +9,9 @@ import (
 	"strings"
 	"sync/atomic"
 
+	"github.com/SyaibanAhmadRamadhan/go-foundation-kit/confy/parser"
+	"github.com/SyaibanAhmadRamadhan/go-foundation-kit/confy/provider"
 	"github.com/SyaibanAhmadRamadhan/go-foundation-kit/observability"
-	"github.com/knadh/koanf/parsers/json"
-	"github.com/knadh/koanf/parsers/yaml"
-	"github.com/knadh/koanf/providers/env"
-	"github.com/knadh/koanf/providers/file"
 	"github.com/knadh/koanf/v2"
 	"github.com/rs/zerolog"
 )
@@ -25,12 +23,12 @@ type Loader[T any] struct {
 	k            *koanf.Koanf      // underlying koanf instance
 	cur          atomic.Pointer[T] // holds the current config snapshot
 	filepath     string            // active config file path
-	fileProvider *file.File        // file provider used for watching
+	fileProvider *provider.File    // file provider used for watching
 	parser       koanf.Parser
 	opt          options // applied options
 
 	// optional
-	envProvider *env.Env // file provider used for watching
+	envProvider *provider.Env // file provider used for watching
 }
 
 // New creates a new Loader with the provided options.
@@ -61,7 +59,7 @@ func New[T any](onChangeWatcher func(*T, error), opts ...Option) (*Loader[T], er
 	l := &Loader[T]{
 		k:            k,
 		opt:          o,
-		fileProvider: file.Provider(path),
+		fileProvider: provider.NewFile(path),
 		parser:       parser,
 		filepath:     path,
 	}
@@ -73,7 +71,7 @@ func New[T any](onChangeWatcher func(*T, error), opts ...Option) (*Loader[T], er
 				return strings.ReplaceAll(s, "__", ".")
 			}
 		}
-		l.envProvider = env.Provider(o.envPrefix, o.delimiter, o.envMapFn)
+		l.envProvider = provider.NewEnv(o.envPrefix, o.delimiter, o.envMapFn)
 	}
 
 	// Initial load
@@ -169,9 +167,9 @@ func pickParser(fileType, path string) (koanf.Parser, error) {
 	}
 	switch t {
 	case "json":
-		return json.Parser(), nil
+		return parser.NewJson(), nil
 	case "yaml", "yml":
-		return yaml.Parser(), nil
+		return parser.NewYaml(), nil
 	default:
 		return nil, fmt.Errorf("confy: unsupported file type %q (path=%s)", t, path)
 	}
