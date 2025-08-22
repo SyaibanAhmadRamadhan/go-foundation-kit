@@ -124,7 +124,6 @@ func (w *lokiHook) Write(p []byte) (n int, err error) {
 			slog.String("env", w.env),
 			slog.Any("payload", payload),
 		)
-		return
 	}
 
 	now := time.Now().UnixNano()

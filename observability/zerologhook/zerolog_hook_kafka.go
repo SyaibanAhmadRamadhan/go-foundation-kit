@@ -75,7 +75,6 @@ func (w *KafkaHook) Write(p []byte) (n int, err error) {
 			slog.String("env", w.Env),
 			slog.Any("payload", payload),
 		)
-		return
 	}
 
 	newP, err := json.Marshal(payload)
