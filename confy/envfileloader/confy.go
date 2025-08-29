@@ -9,6 +9,7 @@ import (
 	"strings"
 	"sync/atomic"
 
+	"github.com/SyaibanAhmadRamadhan/go-foundation-kit/confy"
 	"github.com/SyaibanAhmadRamadhan/go-foundation-kit/confy/parser"
 	"github.com/SyaibanAhmadRamadhan/go-foundation-kit/confy/provider"
 	"github.com/SyaibanAhmadRamadhan/go-foundation-kit/observability"
@@ -142,6 +143,7 @@ func (l *Loader[T]) watch(onChange func(*T, error)) error {
 		if onChange != nil && (l.k.Bool(l.opt.callbackOnChangeWhenOnKeyTrue) || l.opt.callbackOnChangeWhenOnKeyTrue == "") {
 			onChange(l.Get(), nil)
 		}
+		confy.Notify()
 	})
 }
 

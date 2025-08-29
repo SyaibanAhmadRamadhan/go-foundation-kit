@@ -12,11 +12,11 @@ import (
 type Env struct {
 	prefix string
 	delim  string
-	cb     func(key string, value string) (string, interface{})
+	cb     func(key string, value string) (string, any)
 }
 
 // NewEnv returns an environment variables provider that returns
-// a nested map[string]interface{} of environment variable where the
+// a nested map[string]any of environment variable where the
 // nesting hierarchy of keys is defined by delim. For instance, the
 // delim "." will convert the key `parent.child.key: 1`
 // to `{parent: {child: {key: 1}}}`.
@@ -34,7 +34,7 @@ func NewEnv(prefix, delim string, cb func(s string) string) *Env {
 		delim:  delim,
 	}
 	if cb != nil {
-		e.cb = func(key string, value string) (string, interface{}) {
+		e.cb = func(key string, value string) (string, any) {
 			return cb(key), value
 		}
 	}
@@ -45,7 +45,7 @@ func NewEnv(prefix, delim string, cb func(s string) string) *Env {
 // takes a (key, value) with the variable name and value and allows you
 // to modify both. This is useful for cases where you may want to return
 // other types like a string slice instead of just a string.
-func NewEnvWithValue(prefix, delim string, cb func(key string, value string) (string, interface{})) *Env {
+func NewEnvWithValue(prefix, delim string, cb func(key string, value string) (string, any)) *Env {
 	return &Env{
 		prefix: prefix,
 		delim:  delim,
@@ -60,7 +60,7 @@ func (e *Env) ReadBytes() ([]byte, error) {
 
 // Read reads all available environment variables into a key:value map
 // and returns it.
-func (e *Env) Read() (map[string]interface{}, error) {
+func (e *Env) Read() (map[string]any, error) {
 	// Collect the environment variable keys.
 	var keys []string
 	for _, k := range os.Environ() {
@@ -73,7 +73,7 @@ func (e *Env) Read() (map[string]interface{}, error) {
 		}
 	}
 
-	mp := make(map[string]interface{})
+	mp := make(map[string]any)
 	for _, k := range keys {
 		parts := strings.SplitN(k, "=", 2)
 
