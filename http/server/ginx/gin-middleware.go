@@ -43,7 +43,7 @@ func redactSensitiveFields(data map[string]any, sensitive map[string]struct{}) {
 	}
 }
 
-func trace(blacklistRouteLogResponse map[string]struct{}, sensitiveFields map[string]struct{}) gin.HandlerFunc {
+func log(blacklistRouteLogResponse map[string]struct{}, sensitiveFields map[string]struct{}) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		method := c.Request.Method
 		path := c.FullPath()
