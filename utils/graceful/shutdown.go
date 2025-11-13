@@ -9,7 +9,7 @@ import (
 	"time"
 )
 
-func GracefulShutdown(fn func(ctx context.Context) error, timeout time.Duration, osSignals ...os.Signal) {
+func Shutdown(fn func(ctx context.Context) error, timeout time.Duration, osSignals ...os.Signal) {
 	quit := make(chan os.Signal, 1)
 
 	if len(osSignals) == 0 {
