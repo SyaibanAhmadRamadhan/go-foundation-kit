@@ -1,4 +1,4 @@
-package zerologhook
+package loghook
 
 import (
 	"context"

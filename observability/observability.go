@@ -5,8 +5,8 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/SyaibanAhmadRamadhan/go-foundation-kit/observability/loghook"
 	"github.com/SyaibanAhmadRamadhan/go-foundation-kit/observability/otelx"
-	"github.com/SyaibanAhmadRamadhan/go-foundation-kit/observability/zerologhook"
 	"github.com/segmentio/kafka-go"
 	"go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetricgrpc"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
@@ -94,7 +94,7 @@ func NewLogWithKafkaHook(optionsParams LogWithKafkaHookOptions) func() {
 		Transport:    optionsParams.Transport,
 	}
 	NewLog(LogConfig{
-		Hook: &zerologhook.KafkaHook{
+		ZerologHook: &loghook.KafkaHook{
 			Writer:      w,
 			Topic:       optionsParams.Topic,
 			Env:         optionsParams.Env,

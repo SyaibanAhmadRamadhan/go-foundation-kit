@@ -14,7 +14,8 @@ import (
 
 // LogConfig contains configuration options for setting up structured logging.
 type LogConfig struct {
-	Hook          io.Writer // Optional log sink (e.g., Kafka writer). If nil, logs won't be sent to external sinks.
+	ZerologHook   io.Writer // Optional log sink (e.g., Kafka writer). If nil, logs won't be sent to external sinks.
+	SlogHook      io.Writer // Optional log sink (e.g., Kafka writer). If nil, logs won't be sent to external sinks.
 	Mode          string    // Output format: "text" or "json" for slog.
 	Level         string    // Log level: "info", "debug", "warn", "error", etc.
 	Env           string    // Environment name: "production", "staging", "development", etc.
@@ -26,24 +27,17 @@ type LogConfig struct {
 // - If cfg.Hook is nil, logs will only be printed to stdout.
 // - slog is used for local logs; zerolog is used for structured logs (e.g., Kafka).
 func NewLog(cfg LogConfig) {
+	buildSlog(cfg)
+	buildZerolog(cfg)
+}
 
-	slogLevel := parseLevel(cfg.Level)
-	slogHandler := buildSlogHandler(cfg.Mode, slogLevel)
-
-	slog.SetDefault(slog.New(slogHandler))
-	slog.Info("slog initialized",
-		slog.String("env", cfg.Env),
-		slog.String("service", cfg.ServiceName),
-		slog.String("mode", cfg.Mode),
-		slog.String("level", cfg.Level),
-	)
-
+func buildZerolog(cfg LogConfig) {
 	hooks := make([]io.Writer, 0)
 	if cfg.ZerologStdOut {
 		hooks = append(hooks, os.Stdout)
 	}
-	if cfg.Hook != nil {
-		hooks = append(hooks, cfg.Hook)
+	if cfg.ZerologHook != nil {
+		hooks = append(hooks, cfg.ZerologHook)
 	}
 
 	if len(hooks) > 0 {
@@ -61,20 +55,34 @@ func NewLog(cfg LogConfig) {
 	}
 }
 
-// buildSlogHandler returns a slog.Handler configured with the specified mode and log level.
-func buildSlogHandler(mode string, level slog.Level) slog.Handler {
-	opts := &slog.HandlerOptions{Level: level}
-	switch strings.ToLower(mode) {
-	case "json":
-		return slog.NewJSONHandler(os.Stdout, opts)
-	default:
-		return slog.NewTextHandler(os.Stdout, opts)
+// buildSlog returns a slog.Handler configured with the specified mode and log level.
+func buildSlog(cfg LogConfig) {
+	slogLevel := parseSlogLevel(cfg.Level)
+
+	if cfg.SlogHook == nil {
+		cfg.SlogHook = os.Stdout
 	}
+	opts := &slog.HandlerOptions{Level: slogLevel}
+	var slogHandler slog.Handler
+	switch strings.ToLower(cfg.Mode) {
+	case "json":
+		slogHandler = slog.NewJSONHandler(cfg.SlogHook, opts)
+	default:
+		slogHandler = slog.NewTextHandler(cfg.SlogHook, opts)
+	}
+
+	slog.SetDefault(slog.New(slogHandler))
+	slog.Info("slog initialized",
+		slog.String("env", cfg.Env),
+		slog.String("service", cfg.ServiceName),
+		slog.String("mode", cfg.Mode),
+		slog.String("level", cfg.Level),
+	)
 }
 
-// parseLevel converts a string log level into a slog.Level.
+// parseSlogLevel converts a string log level into a slog.Level.
 // Defaults to slog.LevelInfo if level is unrecognized.
-func parseLevel(level string) slog.Level {
+func parseSlogLevel(level string) slog.Level {
 	switch strings.ToLower(level) {
 	case "debug":
 		return slog.LevelDebug
