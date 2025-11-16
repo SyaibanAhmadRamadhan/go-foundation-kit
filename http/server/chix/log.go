@@ -98,7 +98,6 @@ func log(blacklistRouteLogResponse map[string]struct{}, sensitiveFields map[stri
 			next.ServeHTTP(w, r)
 
 			if !ok {
-				next.ServeHTTP(w, r)
 				contentType := w.Header().Get("Content-Type")
 				if strings.Contains(contentType, "application/json") {
 					if json.Unmarshal(blw.body.Bytes(), &respBody) == nil {
@@ -121,8 +120,8 @@ func log(blacklistRouteLogResponse map[string]struct{}, sensitiveFields map[stri
 				Str("path", path).
 				Int("status_code", status)
 
-			err := r.Context().Value(stackTraceKeyCtx).(string)
-			if len(err) > 0 {
+			err, ok := r.Context().Value(stackTraceKeyCtx).(string)
+			if ok && len(err) > 0 {
 				e.Str("error", err)
 			}
 			if respBody != nil {

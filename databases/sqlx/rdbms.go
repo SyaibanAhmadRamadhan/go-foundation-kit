@@ -19,6 +19,8 @@ type RDBMS interface {
 	WriterCommand
 	queryExecutor
 	StmtExecutor
+	Close() error
+	Ping(ctx context.Context) error
 }
 
 // WriterCommand defines write operations (INSERT, UPDATE, DELETE) on the database.

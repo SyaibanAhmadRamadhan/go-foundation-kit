@@ -232,6 +232,9 @@ func (c *rdbms) Close() error {
 	c.sc.close()
 	return c.db.Close()
 }
+func (c *rdbms) Ping(ctx context.Context) error {
+	return c.db.PingContext(ctx)
+}
 
 // callBefore executes all registered DBHook.Before in order, threading context through.
 // Any hook may enrich the context (e.g., tracing IDs, timeouts).
