@@ -1,6 +1,6 @@
 module github.com/SyaibanAhmadRamadhan/go-foundation-kit
 
-go 1.25.3
+go 1.25.4
 
 require (
 	github.com/Masterminds/squirrel v1.5.4
