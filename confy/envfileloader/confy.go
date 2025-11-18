@@ -160,6 +160,10 @@ func (l *Loader[T]) Reload() (*T, error) {
 	return l.Get(), nil
 }
 
+func (l *Loader[T]) Unwatch() error {
+	return l.fileProvider.Unwatch()
+}
+
 // pickParser returns a parser based on file type or extension.
 func pickParser(fileType, path string) (koanf.Parser, error) {
 	t := strings.ToLower(strings.TrimSpace(fileType))
