@@ -3,6 +3,7 @@ package chix
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"strings"
@@ -121,6 +122,7 @@ func log(blacklistRouteLogResponse map[string]struct{}, sensitiveFields map[stri
 				Int("status_code", status)
 
 			err, ok := r.Context().Value(stackTraceKeyCtx).(string)
+			fmt.Println(err)
 			if ok && len(err) > 0 {
 				e.Str("error", err)
 			}

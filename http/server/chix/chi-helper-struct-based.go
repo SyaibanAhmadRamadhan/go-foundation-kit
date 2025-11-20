@@ -88,14 +88,19 @@ func (h *ChiHelper) MustShouldBindJSON(w http.ResponseWriter, r *http.Request, s
 
 	return true, r
 }
-
 func (h *ChiHelper) SetError(r *http.Request, err error) *http.Request {
-	existingError := r.Context().Value(stackTraceKeyCtx).(string)
-	if existingError != "" {
-		existingError += " | " + err.Error()
+	if err == nil {
+		return r
 	}
 
-	return r.WithContext(context.WithValue(r.Context(), stackTraceKeyCtx, existingError))
+	ctx := r.Context()
+
+	if existing, ok := ctx.Value(stackTraceKeyCtx).(string); ok && existing != "" {
+		errStr := existing + " || " + err.Error()
+		return r.WithContext(context.WithValue(ctx, stackTraceKeyCtx, errStr))
+	}
+
+	return r.WithContext(context.WithValue(ctx, stackTraceKeyCtx, err.Error()))
 }
 
 // helper untuk menulis JSON response
@@ -113,24 +118,19 @@ func (h *ChiHelper) ErrorResponse(w http.ResponseWriter, r *http.Request, err er
 		return r
 	}
 
-	var apperr *apperror.Error
+	apperr, ok := apperror.As(err)
 	httpCode := http.StatusInternalServerError
 	msg := "Internal server error"
-	if errors.As(err, &apperr) {
-		httpCode = apperr.Code
+	if ok {
+		httpCode = apperr.Code.ToHTTPCode()
 		if httpCode >= http.StatusInternalServerError {
 			msg = "Internal server error"
 		} else {
-			switch httpCode {
-			case http.StatusUnauthorized:
-				msg = "unauthorized"
-			default:
-				msg = apperr.Error()
-			}
+			msg = apperr.PublicMessage
 		}
 	}
 
-	r = SetError(r, err)
+	r = h.SetError(r, err)
 	Write(w, httpCode, "application/json", map[string]string{
 		h.keyJsonMessage: msg,
 	})
@@ -150,7 +150,7 @@ func (h *ChiHelper) ParseQueryToSliceInt64(value *string) ([]int64, error) {
 	for i, v := range values {
 		intValue, err := strconv.ParseInt(v, 10, 64)
 		if err != nil {
-			return nil, apperror.ErrBadRequest("Invalid query parameter")
+			return nil, apperror.BadRequest("Invalid query parameter")
 		}
 		intValues[i] = intValue
 	}
@@ -168,7 +168,7 @@ func (h *ChiHelper) ParseQueryToSliceFloat64(value *string) ([]float64, error) {
 	for i, v := range values {
 		floatValue, err := strconv.ParseFloat(v, 64)
 		if err != nil {
-			return nil, apperror.ErrBadRequest("Invalid query parameter")
+			return nil, apperror.BadRequest("Invalid query parameter")
 		}
 		floatValues[i] = floatValue
 	}

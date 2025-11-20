@@ -2,7 +2,6 @@ package apperror
 
 import (
 	"errors"
-	"net/http"
 )
 
 var (
@@ -16,56 +15,111 @@ var (
 	ErrTransactionNotFound = errors.New("db transaction is null")
 )
 
-// Error represents a structured application error with a message and HTTP status code.
+// Error represents a structured application error with a generic code,
+// internal message, public message, and optional stack trace.
 type Error struct {
+	// internal message (buat logging)
 	Message string
-	Code    int
+
+	// aman ditampilkan ke user
+	PublicMessage string
+
+	Code  Code
+	Stack string
 }
 
-// Error implements the error interface.
 func (e *Error) Error() string {
+	if e.Stack != "" {
+		return e.Message + " | stack: " + e.Stack
+	}
 	return e.Message
 }
 
-// NewError creates a new application-level error with the given HTTP status code and message.
-func NewError(code int, msg string) error {
-	return &Error{
-		Message: msg,
+func New(code Code, internalMsg string, opts ...Option) error {
+	e := &Error{
+		Message: internalMsg,
 		Code:    code,
 	}
-}
 
-// ErrNotFound creates a new 404 Not Found error with the specified message.
-func ErrNotFound(msg string) error {
-	return NewError(http.StatusNotFound, msg)
-}
-
-// ErrConflict creates a new 409 Conflict error with the specified message.
-func ErrConflict(msg string) error {
-	return NewError(http.StatusConflict, msg)
-}
-
-// ErrBadRequest creates a new 400 Bad Request error with the specified message.
-func ErrBadRequest(msg string) error {
-	return NewError(http.StatusBadRequest, msg)
-}
-
-// ErrUnauthorized creates a new 401 Unauthorized error with the specified message.
-func ErrUnauthorized(msg string) error {
-	return NewError(http.StatusUnauthorized, msg)
-}
-
-// ErrForbidden creates a new 403 Forbidden error with the specified message.
-func ErrForbidden(msg string) error {
-	return NewError(http.StatusForbidden, msg)
-}
-
-// ErrorsAsNotFound returns true if the provided error is an application-level
-// error and has a 404 Not Found HTTP status code.
-func ErrorsAsNotFound(err error) bool {
-	var svcErr *Error
-	if errors.As(err, &svcErr) {
-		return svcErr.Code == http.StatusNotFound
+	for _, opt := range opts {
+		opt(e)
 	}
-	return false
+
+	if e.PublicMessage == "" {
+		e.PublicMessage = e.Message
+	}
+
+	return e
+}
+
+// Helpers dipakai di service layer
+func NotFound(msg string, opts ...Option) error {
+	return New(CodeNotFound, msg, opts...)
+}
+
+func Unknown(msg string, opts ...Option) error {
+	return New(CodeUnknown, msg, opts...)
+}
+
+func Conflict(msg string, opts ...Option) error {
+	return New(CodeConflict, msg, opts...)
+}
+
+func BadRequest(msg string, opts ...Option) error {
+	return New(CodeBadRequest, msg, opts...)
+}
+
+func Unauthorized(msg string, opts ...Option) error {
+	return New(CodeUnauthorized, msg, opts...)
+}
+
+func Forbidden(msg string, opts ...Option) error {
+	return New(CodeForbidden, msg, opts...)
+}
+
+// Predicates
+func hasCode(err error, code Code) bool {
+	var svcErr *Error
+	return errors.As(err, &svcErr) && svcErr.Code == code
+}
+
+func IsNotFound(err error) bool {
+	return hasCode(err, CodeNotFound)
+}
+func IsBadRequest(err error) bool {
+	return hasCode(err, CodeBadRequest)
+}
+func IsUnauthorized(err error) bool {
+	return hasCode(err, CodeUnauthorized)
+}
+func IsForbidden(err error) bool {
+	return hasCode(err, CodeForbidden)
+}
+func IsConflict(err error) bool {
+	return hasCode(err, CodeConflict)
+}
+func IsUnknown(err error) bool {
+	var svcErr *Error
+	if !errors.As(err, &svcErr) {
+		return true
+	}
+	return svcErr.Code == CodeUnknown
+}
+func As(err error) (*Error, bool) {
+	var svcErr *Error
+	ok := errors.As(err, &svcErr)
+	return svcErr, ok
+}
+
+func Is(err error) bool {
+	_, ok := As(err)
+	return ok
+}
+
+func CodeOf(err error) Code {
+	e, ok := As(err)
+	if ok {
+		return e.Code
+	}
+	return CodeUnknown
 }

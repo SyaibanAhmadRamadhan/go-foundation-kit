@@ -13,25 +13,54 @@ import (
 	"github.com/go-playground/validator/v10"
 )
 
+// GinHelper is a small utility wrapper used in HTTP handlers (typically with the gin router)
+// to standardize JSON response keys such as "message" and "error_validations".
+// This helps maintain consistent JSON output format across the application.
+type GinHelper struct {
+	keyJsonMessage     string
+	keyErrorValidation string
+}
+
+// NewGinHelper returns a new GinHelper instance.
+//
+// If keyJsonMessage is empty, it defaults to "message".
+// If keyErrorValidation is empty, it defaults to "error_validations".
+//
+// This allows the caller to override JSON response keys while still providing
+// sensible defaults when not specified.
+func NewGinHelper(keyJsonMessage string, keyErrorValidation string) *GinHelper {
+	if keyJsonMessage == "" {
+		keyJsonMessage = "message"
+	}
+	if keyErrorValidation == "" {
+		keyErrorValidation = "error_validations"
+	}
+
+	return &GinHelper{
+		keyJsonMessage:     keyJsonMessage,
+		keyErrorValidation: keyErrorValidation,
+	}
+}
+
 // MustShouldBind attempts to bind the request payload to the given struct.
 // - If validation fails (validator.v10), it returns 400 with structured errors.
 // - If binding/parsing fails (JSON/form decode, type mismatch, etc.), it returns 422 with the raw error.
 // Returns false if response is already written; true if everything is OK.
-func MustShouldBind(c *gin.Context, req any) bool {
+func (h *GinHelper) MustShouldBind(c *gin.Context, req any) bool {
 	if err := c.ShouldBind(req); err != nil {
 		c.Error(err)
 
 		var verr validator.ValidationErrors
 		if errors.As(err, &verr) {
 			c.JSON(http.StatusBadRequest, map[string]any{
-				"message":           "Validation error",
-				"error_validations": validatorx.ParseValidationErrors(verr),
+				h.keyJsonMessage:     "Validation error",
+				h.keyErrorValidation: validatorx.ParseValidationErrors(verr),
 			})
 			return false
 		}
 
 		c.JSON(http.StatusUnprocessableEntity, map[string]any{
-			"message": err.Error(),
+			h.keyJsonMessage: err.Error(),
 		})
 		return false
 	}
@@ -42,15 +71,15 @@ func MustShouldBind(c *gin.Context, req any) bool {
 		var verr validator.ValidationErrors
 		if errors.As(err, &verr) {
 			c.JSON(http.StatusBadRequest, map[string]any{
-				"message":           "Validation error",
-				"error_validations": validatorx.ParseValidationErrors(verr),
+				h.keyJsonMessage:     "Validation error",
+				h.keyErrorValidation: validatorx.ParseValidationErrors(verr),
 			})
 			return false
 		}
 
 		// error lain saat validasi (jarang, tapi jaga-jaga)
 		c.JSON(http.StatusUnprocessableEntity, map[string]any{
-			"message": err.Error(),
+			h.keyJsonMessage: err.Error(),
 		})
 		return false
 	}
@@ -61,7 +90,7 @@ func MustShouldBind(c *gin.Context, req any) bool {
 // ErrorResponse writes an error response to the context.
 // If the error is of type *apperror.Error, it uses the associated HTTP code.
 // Internal server errors are masked with a generic message.
-func ErrorResponse(c *gin.Context, err error) {
+func (h *GinHelper) ErrorResponse(c *gin.Context, err error) {
 	if err == nil {
 		return
 	}
@@ -78,13 +107,13 @@ func ErrorResponse(c *gin.Context, err error) {
 	}
 	c.Error(err)
 	c.JSON(httpCode, map[string]string{
-		"message": msg,
+		h.keyJsonMessage: msg,
 	})
 }
 
 // ParseQueryToSliceInt64 parses a comma-separated string query value into a slice of int64.
 // If the value is empty or nil, it returns nil.
-func ParseQueryToSliceInt64(value *string) ([]int64, error) {
+func (h *GinHelper) ParseQueryToSliceInt64(value *string) ([]int64, error) {
 	if value == nil || *value == "" {
 		return nil, nil
 	}
@@ -103,7 +132,7 @@ func ParseQueryToSliceInt64(value *string) ([]int64, error) {
 
 // ParseQueryToSliceFloat64 parses a comma-separated string query value into a slice of float64.
 // If the value is empty or nil, it returns nil.
-func ParseQueryToSliceFloat64(value *string) ([]float64, error) {
+func (h *GinHelper) ParseQueryToSliceFloat64(value *string) ([]float64, error) {
 	if value == nil || *value == "" {
 		return nil, nil
 	}
@@ -121,7 +150,7 @@ func ParseQueryToSliceFloat64(value *string) ([]float64, error) {
 
 // ParseQueryToSliceString parses a comma-separated string query value into a slice of strings.
 // If the value is empty or nil, it returns nil.
-func ParseQueryToSliceString(value *string) ([]string, error) {
+func (h *GinHelper) ParseQueryToSliceString(value *string) ([]string, error) {
 	if value == nil || *value == "" {
 		return nil, nil
 	}
@@ -130,7 +159,7 @@ func ParseQueryToSliceString(value *string) ([]string, error) {
 
 // BindToPaginationInput extracts pagination parameters from the context.
 // If parameters are not set, it defaults to page=1 and pageSize=25.
-func BindToPaginationInput(c *gin.Context) primitive.PaginationInput {
+func (h *GinHelper) BindToPaginationInput(c *gin.Context) primitive.PaginationInput {
 	pagination := primitive.PaginationInput{
 		Page:     1,
 		PageSize: 25,
