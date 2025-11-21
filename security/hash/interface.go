@@ -1,5 +1,5 @@
 //go:generate go tool mockgen -destination=../../.mocking/hash_mock/hash_mock.go -package=hash_mock . Hasher
-package hash
+package hashx
 
 type Hasher interface {
 	Hash(str string) (string, error)

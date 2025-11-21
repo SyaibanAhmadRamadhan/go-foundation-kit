@@ -1,13 +1,13 @@
-package hash_test
+package hashx_test
 
 import (
 	"testing"
 
-	"github.com/SyaibanAhmadRamadhan/go-foundation-kit/security/hash"
+	hashx "github.com/SyaibanAhmadRamadhan/go-foundation-kit/security/hash"
 )
 
 func TestHasher_HashAndVerify(t *testing.T) {
-	hasher := hash.NewHasherArgon2ID(hash.DefaultConfigArgon2ID)
+	hasher := hashx.NewHasherArgon2ID(hashx.DefaultConfigArgon2ID)
 	password := "supersecret123"
 
 	t.Run("success verify", func(t *testing.T) {
@@ -49,7 +49,7 @@ func TestHasher_HashAndVerify(t *testing.T) {
 }
 
 func BenchmarkHasher_Hash(b *testing.B) {
-	hasher := hash.NewHasherArgon2ID(hash.DefaultConfigArgon2ID)
+	hasher := hashx.NewHasherArgon2ID(hashx.DefaultConfigArgon2ID)
 	password := "benchmarkpassword"
 
 	b.ReportAllocs()
@@ -62,7 +62,7 @@ func BenchmarkHasher_Hash(b *testing.B) {
 }
 
 func BenchmarkHasher_Verify(b *testing.B) {
-	hasher := hash.NewHasherArgon2ID(hash.DefaultConfigArgon2ID)
+	hasher := hashx.NewHasherArgon2ID(hashx.DefaultConfigArgon2ID)
 	password := "benchmarkpassword"
 
 	hashPassword, err := hasher.Hash(password)

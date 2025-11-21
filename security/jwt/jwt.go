@@ -1,4 +1,4 @@
-package customjwt
+package jwtx
 
 import (
 	"errors"
