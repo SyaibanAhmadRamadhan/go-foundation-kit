@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"slices"
 	"strings"
 
 	"github.com/SyaibanAhmadRamadhan/go-foundation-kit/observability"
@@ -127,11 +128,6 @@ type CorsConfig struct {
 }
 
 func cors(config CorsConfig) gin.HandlerFunc {
-	allowOrigins := "*"
-	if len(config.AllowOrigins) > 0 {
-		allowOrigins = strings.Join(config.AllowOrigins, ", ")
-	}
-
 	allowMethods := "POST, OPTIONS, GET, PUT, PATCH, DELETE"
 	if len(config.AllowMethods) > 0 {
 		allowMethods = strings.Join(config.AllowMethods, ", ")
@@ -143,7 +139,20 @@ func cors(config CorsConfig) gin.HandlerFunc {
 	}
 
 	return func(c *gin.Context) {
-		c.Writer.Header().Set("Access-Control-Allow-Origin", allowOrigins)
+		origin := c.Request.Header.Get("Origin")
+		allowedOrigin := ""
+
+		if len(config.AllowOrigins) == 1 && config.AllowOrigins[0] == "*" {
+			allowedOrigin = "*"
+		} else {
+			if slices.Contains(config.AllowOrigins, origin) {
+				allowedOrigin = origin
+			}
+		}
+
+		if allowedOrigin != "" {
+			c.Writer.Header().Set("Access-Control-Allow-Origin", allowedOrigin)
+		}
 		if config.AllowCredentials {
 			c.Writer.Header().Set("Access-Control-Allow-Credentials", "true")
 		}
