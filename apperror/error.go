@@ -61,7 +61,7 @@ func Unknown(msg string, opts ...Option) error {
 	return New(CodeUnknown, msg, opts...)
 }
 
-func StdUnknown(err Error) error {
+func StdUnknown(err error) error {
 	return New(CodeUnknown, err.Error(), WithStack(), WithPublicMessage("internal server error"))
 }
 
