@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/SyaibanAhmadRamadhan/go-foundation-kit/observability"
@@ -124,6 +125,8 @@ type CorsConfig struct {
 	AllowOrigins     []string
 	AllowMethods     []string
 	AllowHeaders     []string
+	ExposeHeaders    []string
+	MaxAge           int // dalam detik
 	AllowCredentials bool
 }
 
@@ -138,13 +141,26 @@ func cors(config CorsConfig) gin.HandlerFunc {
 		allowHeaders = strings.Join(config.AllowHeaders, ", ")
 	}
 
+	exposeHeaders := ""
+	if len(config.ExposeHeaders) > 0 {
+		exposeHeaders = strings.Join(config.ExposeHeaders, ", ")
+	}
+
+	// Max Age default 1 hour
+	maxAge := 3600
+	if config.MaxAge > 0 {
+		maxAge = config.MaxAge
+	}
+
 	return func(c *gin.Context) {
 		origin := c.Request.Header.Get("Origin")
 		allowedOrigin := ""
 
+		// wildcard
 		if len(config.AllowOrigins) == 1 && config.AllowOrigins[0] == "*" {
 			allowedOrigin = "*"
 		} else {
+			// exact match only
 			if slices.Contains(config.AllowOrigins, origin) {
 				allowedOrigin = origin
 			}
@@ -153,16 +169,24 @@ func cors(config CorsConfig) gin.HandlerFunc {
 		if allowedOrigin != "" {
 			c.Writer.Header().Set("Access-Control-Allow-Origin", allowedOrigin)
 		}
+
 		if config.AllowCredentials {
 			c.Writer.Header().Set("Access-Control-Allow-Credentials", "true")
 		}
+
 		c.Writer.Header().Set("Access-Control-Allow-Headers", allowHeaders)
 		c.Writer.Header().Set("Access-Control-Allow-Methods", allowMethods)
+		c.Writer.Header().Set("Access-Control-Max-Age", strconv.Itoa(maxAge))
+
+		if exposeHeaders != "" {
+			c.Writer.Header().Set("Access-Control-Expose-Headers", exposeHeaders)
+		}
 
 		if c.Request.Method == "OPTIONS" {
 			c.AbortWithStatus(http.StatusNoContent)
 			return
 		}
+
 		c.Next()
 	}
 }
