@@ -165,11 +165,11 @@ func (h *GinHelper) BindToPaginationInput(c *gin.Context) primitive.PaginationIn
 		PageSize: 25,
 	}
 
-	page := c.GetInt64("page")
+	page, _ := strconv.ParseInt(c.Query("page"), 10, 64)
 	if page != 0 {
 		pagination.Page = page
 	}
-	pageSize := c.GetInt64("page_size")
+	pageSize, _ := strconv.ParseInt(c.Query("page_size"), 10, 64)
 	if pageSize != 0 {
 		pagination.PageSize = pageSize
 	}
