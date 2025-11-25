@@ -113,9 +113,9 @@ func (h *GinHelper) ErrorResponse(c *gin.Context, err error) {
 
 // ParseQueryToSliceInt64 parses a comma-separated string query value into a slice of int64.
 // If the value is empty or nil, it returns nil.
-func (h *GinHelper) ParseQueryToSliceInt64(value *string) ([]int64, error) {
+func (h *GinHelper) MustParseQueryToSliceInt64(value *string) []int64 {
 	if value == nil || *value == "" {
-		return nil, nil
+		return nil
 	}
 
 	values := strings.Split(*value, ",")
@@ -123,38 +123,40 @@ func (h *GinHelper) ParseQueryToSliceInt64(value *string) ([]int64, error) {
 	for i, v := range values {
 		intValue, err := strconv.ParseInt(v, 10, 64)
 		if err != nil {
-			return nil, apperror.BadRequest("Invalid query parameter")
+			intValues[i] = 0
+			continue
 		}
 		intValues[i] = intValue
 	}
-	return intValues, nil
+	return intValues
 }
 
 // ParseQueryToSliceFloat64 parses a comma-separated string query value into a slice of float64.
 // If the value is empty or nil, it returns nil.
-func (h *GinHelper) ParseQueryToSliceFloat64(value *string) ([]float64, error) {
+func (h *GinHelper) MustParseQueryToSliceFloat64(value *string) []float64 {
 	if value == nil || *value == "" {
-		return nil, nil
+		return nil
 	}
 	values := strings.Split(*value, ",")
 	floatValues := make([]float64, len(values))
 	for i, v := range values {
 		floatValue, err := strconv.ParseFloat(v, 64)
 		if err != nil {
-			return nil, apperror.BadRequest("Invalid query parameter")
+			floatValues[i] = 0
+			continue
 		}
 		floatValues[i] = floatValue
 	}
-	return floatValues, nil
+	return floatValues
 }
 
 // ParseQueryToSliceString parses a comma-separated string query value into a slice of strings.
 // If the value is empty or nil, it returns nil.
-func (h *GinHelper) ParseQueryToSliceString(value *string) ([]string, error) {
+func (h *GinHelper) ParseQueryToSliceString(value *string) []string {
 	if value == nil || *value == "" {
-		return nil, nil
+		return nil
 	}
-	return strings.Split(*value, ","), nil
+	return strings.Split(*value, ",")
 }
 
 // BindToPaginationInput extracts pagination parameters from the context.
