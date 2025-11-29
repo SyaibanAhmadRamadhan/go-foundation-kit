@@ -61,3 +61,21 @@ func FromPtr[T any](p *T) T {
 	}
 	return *p
 }
+
+func CastPtr[From any, To any](v *From, cast func(From) To) *To {
+	if v == nil {
+		return nil
+	}
+
+	out := cast(*v)
+	return &out
+}
+
+func CastConstStringPtr[To, From ~string](v *From) *To {
+	if v == nil {
+		return nil
+	}
+
+	out := To(*v)
+	return &out
+}
