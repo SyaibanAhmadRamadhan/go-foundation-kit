@@ -79,3 +79,10 @@ func CastConstStringPtr[To, From ~string](v *From) *To {
 	out := To(*v)
 	return &out
 }
+
+func TransformPointer[From any, To any](in *From, transform func(*From) *To) *To {
+	if in == nil {
+		return nil
+	}
+	return transform(in)
+}
