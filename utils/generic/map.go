@@ -165,3 +165,189 @@ func TransformToMapSliceValueSimple[In any, K comparable](input []In, keyFunc fu
 	}
 	return result
 }
+
+// TransfromToSliceFromMap transforms a map into a slice using a provided transformation function.
+//
+// Type Parameters:
+//   - K: the type of the keys in the input map (must be comparable)
+//   - V: the type of the values in the input map
+//
+// Parameters:
+//   - m: a map with keys of type K and values of type V
+//   - transform: a function that takes a K and a V and returns any type
+//
+// Returns:
+//   - a slice containing the transformed elements
+//
+// Example:
+//
+//	myMap := map[string]int{"a": 1, "b": 2, "c": 3}
+//	slice := TransfromToSliceFromMap(myMap, func(k string, v int) any {
+//	    return fmt.Sprintf("%s=%d", k, v)
+//	})
+//	// slice => []any{"a=1", "b=2", "c=3"} (order may vary)
+func TransfromToSliceFromMap[K comparable, V any](m map[K]V, transform func(K, V) any) []any {
+	result := make([]any, 0, len(m))
+	for k, v := range m {
+		result = append(result, transform(k, v))
+	}
+	return result
+}
+
+// MapGetOr retrieves the value for a key from a map, or returns a default value if the key doesn't exist.
+//
+// Type Parameters:
+//   - K: the type of the keys in the map (must be comparable)
+//   - V: the type of the values in the map
+//
+// Parameters:
+//   - m: a map with keys of type K and values of type V
+//   - key: the key to look up in the map
+//   - defaultValue: the value to return if the key is not found
+//
+// Returns:
+//   - the value associated with the key, or defaultValue if key doesn't exist
+//
+// Example:
+//
+//	myMap := map[string]int{"a": 1, "b": 2}
+//	value := MapGetOr(myMap, "c", 999)
+//	// value => 999 (since "c" doesn't exist)
+//	value2 := MapGetOr(myMap, "a", 999)
+//	// value2 => 1 (since "a" exists)
+func MapGetOr[K comparable, V any](m map[K]V, key K, defaultValue V) V {
+	if value, ok := m[key]; ok {
+		return value
+	}
+	return defaultValue
+}
+
+// MapGetOrFunc retrieves the value for a key from a map, or calls a function to get a default value if the key doesn't exist.
+//
+// Type Parameters:
+//   - K: the type of the keys in the map (must be comparable)
+//   - V: the type of the values in the map
+//
+// Parameters:
+//   - m: a map with keys of type K and values of type V
+//   - key: the key to look up in the map
+//   - defaultFunc: a function that returns the default value if the key is not found
+//
+// Returns:
+//   - the value associated with the key, or the result of defaultFunc() if key doesn't exist
+//
+// Example:
+//
+//	myMap := map[string][]int{"a": {1, 2}, "b": {3, 4}}
+//	value := MapGetOrFunc(myMap, "c", func() []int { return []int{} })
+//	// value => [] (empty slice from function)
+func MapGetOrFunc[K comparable, V any](m map[K]V, key K, defaultFunc func() V) V {
+	if value, ok := m[key]; ok {
+		return value
+	}
+	return defaultFunc()
+}
+
+// MapGetAndTransform retrieves a value from the map and transforms it, returning both the result and whether the key was found.
+//
+// Type Parameters:
+//   - K: the type of the keys in the map (must be comparable)
+//   - V: the type of the values in the map
+//   - R: the type of the transformed result
+//
+// Parameters:
+//   - m: a map with keys of type K and values of type V
+//   - key: the key to look up in the map
+//   - transform: a function that transforms V to R
+//
+// Returns:
+//   - result: the transformed value (zero value of R if key not found)
+//   - found: true if the key exists in the map, false otherwise
+//
+// Example:
+//
+//	type User struct { ID int; Name string }
+//	type UserSummary struct { Name string; Active bool }
+//
+//	userMap := map[int]User{1: {ID: 1, Name: "Alice"}, 2: {ID: 2, Name: "Bob"}}
+//
+//	// Transform to array of struct
+//	summaries, found := MapGetAndTransform(userMap, 1, func(u User) []UserSummary {
+//	    return []UserSummary{{Name: u.Name, Active: true}}
+//	})
+//	// summaries => []UserSummary{{Name: "Alice", Active: true}}, found => true
+//
+//	summaries2, found2 := MapGetAndTransform(userMap, 999, func(u User) []UserSummary {
+//	    return []UserSummary{{Name: u.Name, Active: true}}
+//	})
+//	// summaries2 => []UserSummary{} (empty slice), found2 => false
+func MapGetAndTransform[K comparable, V any, R any](m map[K]V, key K, transform func(V) R) (R, bool) {
+	if value, ok := m[key]; ok {
+		return transform(value), true
+	}
+	var zero R
+	return zero, false
+}
+
+// MustMapGetAndTransform retrieves a value from the map and transforms it, returning only the result.
+// If the key is not found, returns the zero value of R.
+//
+// Type Parameters:
+//   - K: the type of the keys in the map (must be comparable)
+//   - V: the type of the values in the map
+//   - R: the type of the transformed result
+//
+// Parameters:
+//   - m: a map with keys of type K and values of type V
+//   - key: the key to look up in the map
+//   - transform: a function that transforms V to R
+//
+// Returns:
+//   - the transformed value, or zero value of R if key not found
+//
+// Example:
+//
+//	type Order struct { ID int; Items []string }
+//	type OrderDetail struct { ID int; ItemCount int }
+//
+//	// Case 1: Map value is single struct
+//	orderMap := map[int]Order{
+//	    1: {ID: 1, Items: []string{"item1", "item2"}},
+//	    2: {ID: 2, Items: []string{"item3"}},
+//	}
+//
+//	details := MustMapGetAndTransform(orderMap, 1, func(o Order) []OrderDetail {
+//	    return []OrderDetail{{ID: o.ID, ItemCount: len(o.Items)}}
+//	})
+//	// details => []OrderDetail{{ID: 1, ItemCount: 2}}
+//
+//	// Case 2: Map value is array of struct
+//	orderArrayMap := map[int][]Order{
+//	    1: {{ID: 1, Items: []string{"item1", "item2"}}, {ID: 2, Items: []string{"item3"}}},
+//	    2: {{ID: 3, Items: []string{"item4", "item5", "item6"}}},
+//	}
+//
+//	allDetails := MustMapGetAndTransform(orderArrayMap, 1, func(orders []Order) []OrderDetail {
+//	    var details []OrderDetail
+//	    for _, o := range orders {
+//	        details = append(details, OrderDetail{ID: o.ID, ItemCount: len(o.Items)})
+//	    }
+//	    return details
+//	})
+//	// allDetails => []OrderDetail{{ID: 1, ItemCount: 2}, {ID: 2, ItemCount: 1}}
+//
+//	emptyDetails := MustMapGetAndTransform(orderArrayMap, 999, func(orders []Order) []OrderDetail {
+//	    var details []OrderDetail
+//	    for _, o := range orders {
+//	        details = append(details, OrderDetail{ID: o.ID, ItemCount: len(o.Items)})
+//	    }
+//	    return details
+//	})
+//	// emptyDetails => []OrderDetail{} (empty slice since key not found)
+func MustMapGetAndTransform[K comparable, V any, R any](m map[K]V, key K, transform func(V) R) R {
+	if value, ok := m[key]; ok {
+		return transform(value)
+	}
+	var zero R
+	return zero
+}
