@@ -102,3 +102,7 @@ func (r *Reader) CommitMessages(ctx context.Context, messages ...kafka.Message) 
 func (r *Reader) Close() error {
 	return r.R.Close()
 }
+
+func (r *Reader) KafkaReader() *kafka.Reader {
+	return r.R
+}

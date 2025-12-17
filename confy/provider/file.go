@@ -8,6 +8,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/SyaibanAhmadRamadhan/go-foundation-kit/confy/parser"
 	"github.com/fsnotify/fsnotify"
 )
 
@@ -22,8 +23,45 @@ type File struct {
 }
 
 // NewFile returns a file provider.
-func NewFile(path string) *File {
-	return &File{path: filepath.Clean(path)}
+func NewFile(path string) (*File, error) {
+	_, err := os.ReadFile(path)
+	if err != nil {
+		return nil, fmt.Errorf("file provider: cannot read file %s: %w", path, err)
+	}
+
+	return &File{path: filepath.Clean(path)}, nil
+}
+
+func NewFiles(paths ...string) (*File, error) {
+	if len(paths) == 0 {
+		return nil, errors.New("file provider: no file paths provided")
+	}
+
+	// Just use the first valid file path.
+	for _, path := range paths {
+		f, err := NewFile(path)
+		if err == nil {
+			return f, nil
+		}
+	}
+
+	return nil, fmt.Errorf("file provider: no valid file found in provided paths: %v", paths)
+}
+
+func (f *File) Name() string {
+	return fmt.Sprintf("file:%s", f.path)
+}
+
+func (f *File) Parser() Parser {
+	ext := filepath.Ext(f.path)
+	switch ext {
+	case ".yaml", ".yml":
+		return parser.NewYaml()
+	case ".json":
+		return parser.NewJson()
+	default:
+		return nil
+	}
 }
 
 // ReadBytes reads the contents of a file on disk and returns the bytes.

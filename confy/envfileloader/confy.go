@@ -57,10 +57,15 @@ func New[T any](onChangeWatcher func(*T, error), opts ...Option) (*Loader[T], er
 		return nil, err
 	}
 
+	fileProvider, err := provider.NewFile(path)
+	if err != nil {
+		return nil, err
+	}
+
 	l := &Loader[T]{
 		k:            k,
 		opt:          o,
-		fileProvider: provider.NewFile(path),
+		fileProvider: fileProvider,
 		parser:       parser,
 		filepath:     path,
 	}

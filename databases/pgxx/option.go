@@ -1,7 +1,7 @@
 package pgxx
 
 import (
-	"github.com/SyaibanAhmadRamadhan/go-foundation-kit/databases/pgxx/otelpgx"
+	"github.com/SyaibanAhmadRamadhan/go-foundation-kit/observability/otelpgx"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 

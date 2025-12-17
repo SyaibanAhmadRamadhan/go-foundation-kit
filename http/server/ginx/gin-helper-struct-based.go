@@ -48,7 +48,7 @@ func NewGinHelper(keyJsonMessage string, keyErrorValidation string) *GinHelper {
 // Returns false if response is already written; true if everything is OK.
 func (h *GinHelper) MustShouldBind(c *gin.Context, req any) bool {
 	if err := c.ShouldBind(req); err != nil {
-		c.Error(err)
+		_ = c.Error(err)
 
 		var verr validator.ValidationErrors
 		if errors.As(err, &verr) {
@@ -66,7 +66,7 @@ func (h *GinHelper) MustShouldBind(c *gin.Context, req any) bool {
 	}
 
 	if err := validatorx.Validate.StructCtx(c.Request.Context(), req); err != nil {
-		c.Error(err)
+		_ = c.Error(err)
 
 		var verr validator.ValidationErrors
 		if errors.As(err, &verr) {
@@ -105,7 +105,7 @@ func (h *GinHelper) ErrorResponse(c *gin.Context, err error) {
 			msg = apperr.PublicMessage
 		}
 	}
-	c.Error(err)
+	_ = c.Error(err)
 	c.JSON(httpCode, map[string]string{
 		h.keyJsonMessage: msg,
 	})

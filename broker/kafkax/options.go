@@ -8,15 +8,15 @@ import (
 // This is part of the functional options pattern commonly used in Go.
 type Options func(cfg *broker)
 
-// Writer creates an option to initialize a Kafka writer using the given
-// broker addresses and topic.
+// SetWriter configures a Kafka writer for the broker with the specified key, brokers, and topic.
 //
 // Parameters:
-//   - brokers: list of Kafka broker addresses (e.g., []string{"localhost:9092"})
-//   - topic: the Kafka topic to which messages will be written
+//   - key: identifier for the Kafka writer
+//   - brokers: list of Kafka broker addresses
+//   - topic: Kafka topic to which messages will be published
 //
-// The writer will use the LeastBytes balancer strategy to distribute messages.
-func Writer(key string, brokers []string, topic string) Options {
+// Panics if no brokers are provided or if the topic is empty.
+func SetWriter(key string, brokers []string, topic string) Options {
 	return func(cfg *broker) {
 		if len(brokers) == 0 {
 			panic("kafka writer: no brokers provided")
@@ -32,11 +32,15 @@ func Writer(key string, brokers []string, topic string) Options {
 	}
 }
 
-// CustomWriter allows you to provide a fully customized *kafka.Writer instance.
+// SetCustomWriter allows setting a pre-configured Kafka writer for the broker.
 //
-// Useful if you want fine-grained control over Kafka writer configuration such as
-// retries, batch size, compression, async, etc.
-func CustomWriter(key string, k *kafka.Writer) Options {
+// This is useful when you need to customize the writer beyond the basic configuration
+// provided by SetWriter.
+//
+// Parameters:
+//   - key: identifier for the Kafka writer
+//   - k: pre-configured *kafka.Writer instance
+func SetCustomWriter(key string, k *kafka.Writer) Options {
 	return func(cfg *broker) {
 		cfg.writers[key] = k
 	}

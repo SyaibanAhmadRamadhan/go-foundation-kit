@@ -19,11 +19,12 @@ var ErrJsonUnmarshal = errors.New("json unmarshal error")
 // broker manages Kafka readers and writers, along with optional tracing integrations.
 // It implements the KafkaBroker interface.
 type broker struct {
-	writers       map[string]*kafka.Writer
 	pubTracer     TracerPub
 	consumeTracer TracerConsume
 	commitTracer  TracerCommitMessage
-	readers       []*Reader
+
+	writers map[string]*kafka.Writer
+	readers []*Reader
 }
 
 // Ensure broker implements KafkaPubSub interface
@@ -37,7 +38,7 @@ var _ PubSub = (*broker)(nil)
 //
 // Returns:
 //   - KafkaBroker: initialized broker instance
-func New(opts ...Options) *broker {
+func New(opts ...Options) (*broker, error) {
 	b := &broker{
 		readers: make([]*Reader, 0),
 	}
@@ -48,8 +49,11 @@ func New(opts ...Options) *broker {
 	ctxPing, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	PingWriters(ctxPing, b.writers)
-	return b
+	err := PingWriters(ctxPing, b.writers)
+	if err != nil {
+		return nil, err
+	}
+	return b, nil
 }
 
 // Close closes the Kafka writer and all registered readers.
