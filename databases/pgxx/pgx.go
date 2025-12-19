@@ -102,6 +102,10 @@ func (s *rdbms) QueryRowSq(ctx context.Context, query squirrel.Sqlizer) (pgx.Row
 	return s.QueryRow(ctx, rawQuery, args...), nil
 }
 
+func (s *rdbms) GetDB() *pgxpool.Pool {
+	return s.db
+}
+
 // QuerySqPagination executes a paginated SELECT query built with Squirrel.
 //
 // It uses countQuery to retrieve the total number of records,

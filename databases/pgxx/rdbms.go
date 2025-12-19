@@ -8,6 +8,7 @@ import (
 	"github.com/SyaibanAhmadRamadhan/go-foundation-kit/utils/primitive"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 // RDBMS is a high-level interface for interacting with PostgreSQL using pgx and Squirrel.
@@ -16,6 +17,7 @@ type RDBMS interface {
 	ReadQuery
 	WriterCommand
 	queryExecutor
+	GetDB() *pgxpool.Pool
 }
 
 // WriterCommand defines write operations (INSERT, UPDATE, DELETE) on the database.
