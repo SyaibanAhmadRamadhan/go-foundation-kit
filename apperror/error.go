@@ -2,6 +2,7 @@ package apperror
 
 import (
 	"errors"
+	"fmt"
 )
 
 var (
@@ -26,13 +27,28 @@ type Error struct {
 
 	Code  Code
 	Stack string
+
+	Cause error // <- tambah
+}
+
+func (e *Error) Unwrap() error { return e.Cause }
+
+func (e *Error) Is(target error) bool {
+	t, ok := target.(*Error)
+	if !ok {
+		return false
+	}
+	return e.Code == t.Code
 }
 
 func (e *Error) Error() string {
-	if e.Stack != "" {
-		return e.Message + " | stack: " + e.Stack
+	if len(e.Stack) == 0 {
+		return e.Message
 	}
-	return e.Message
+
+	msg := e.Message + "\n\nStack trace:\n" + e.Stack
+
+	return msg
 }
 
 func New(code Code, internalMsg string, opts ...Option) error {
@@ -62,7 +78,22 @@ func Unknown(msg string, opts ...Option) error {
 }
 
 func StdUnknown(err error) error {
-	return New(CodeUnknown, err.Error(), WithStack(), WithPublicMessage("internal server error"))
+	if err == nil {
+		return nil
+	}
+
+	if errors.Is(err, ErrUnknown) {
+		return New(CodeUnknown, err.Error(),
+			WithCause(err),
+			WithPublicMessage("internal server error"),
+		)
+	}
+
+	return New(CodeUnknown, err.Error(),
+		WithCause(err),
+		WithStack(),
+		WithPublicMessage("internal server error"),
+	)
 }
 
 func Conflict(msg string, opts ...Option) error {
@@ -81,43 +112,22 @@ func Forbidden(msg string, opts ...Option) error {
 	return New(CodeForbidden, msg, opts...)
 }
 
-// Predicates
-func hasCode(err error, code Code) bool {
-	var svcErr *Error
-	return errors.As(err, &svcErr) && svcErr.Code == code
-}
+func IsNotFound(err error) bool { return errors.Is(err, ErrNotFound) }
 
-func IsNotFound(err error) bool {
-	return hasCode(err, CodeNotFound)
-}
-func IsBadRequest(err error) bool {
-	return hasCode(err, CodeBadRequest)
-}
-func IsUnauthorized(err error) bool {
-	return hasCode(err, CodeUnauthorized)
-}
-func IsForbidden(err error) bool {
-	return hasCode(err, CodeForbidden)
-}
-func IsConflict(err error) bool {
-	return hasCode(err, CodeConflict)
-}
-func IsUnknown(err error) bool {
-	var svcErr *Error
-	if !errors.As(err, &svcErr) {
-		return true
-	}
-	return svcErr.Code == CodeUnknown
-}
+func IsBadRequest(err error) bool { return errors.Is(err, ErrBadRequest) }
+
+func IsUnauthorized(err error) bool { return errors.Is(err, ErrUnauthorized) }
+
+func IsForbidden(err error) bool { return errors.Is(err, ErrForbidden) }
+
+func IsConflict(err error) bool { return errors.Is(err, ErrConflict) }
+
+func IsUnknown(err error) bool { return errors.Is(err, ErrUnknown) }
+
 func As(err error) (*Error, bool) {
 	var svcErr *Error
 	ok := errors.As(err, &svcErr)
 	return svcErr, ok
-}
-
-func Is(err error) bool {
-	_, ok := As(err)
-	return ok
 }
 
 func CodeOf(err error) Code {
@@ -126,4 +136,8 @@ func CodeOf(err error) Code {
 		return e.Code
 	}
 	return CodeUnknown
+}
+
+func Format(err error, msg string) error {
+	return fmt.Errorf("%s -> %w", msg, err)
 }

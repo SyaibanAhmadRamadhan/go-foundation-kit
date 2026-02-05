@@ -52,3 +52,12 @@ func (c Code) ToGRPCCode() codes.Code {
 		return codes.Internal
 	}
 }
+
+var (
+	ErrNotFound     = &Error{Code: CodeNotFound}
+	ErrBadRequest   = &Error{Code: CodeBadRequest}
+	ErrUnauthorized = &Error{Code: CodeUnauthorized}
+	ErrForbidden    = &Error{Code: CodeForbidden}
+	ErrConflict     = &Error{Code: CodeConflict}
+	ErrUnknown      = &Error{Code: CodeUnknown}
+)

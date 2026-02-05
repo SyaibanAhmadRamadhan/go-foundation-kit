@@ -32,10 +32,8 @@ const (
 	topicKey        ctxKey = "kafkaTopicOtel"
 )
 
-var (
-	// kafkaLibVersion will be populated dynamically from build info if available.
-	kafkaLibVersion = "unknown"
-)
+// kafkaLibVersion will be populated dynamically from build info if available.
+var kafkaLibVersion = "unknown"
 
 // opentelemetry implements TracerPub, TracerSub, and TracerCommitMessage interfaces
 // using OpenTelemetry for distributed tracing.

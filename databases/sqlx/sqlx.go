@@ -8,7 +8,6 @@ import (
 
 type rdbms struct {
 	db    *sql.DB
-	sc    *stmtCache
 	tx    *sql.Tx
 	hooks []DBHook
 }
@@ -32,28 +31,8 @@ func NewRDBMS(db *sql.DB, opts ...Option) *rdbms {
 		o.apply(cfg)
 	}
 
-	sc := &stmtCache{
-		shards:   make([]shard, cfg.shardCount),
-		hashFn:   cfg.hashFn,
-		minCount: cfg.minCount,
-		janIntv:  cfg.janIntv,
-		idleTTL:  cfg.idleTTL,
-	}
-	for i := range sc.shards {
-		sc.shards[i] = shard{
-			core:  make(map[string]*entry),
-			queue: make(map[string]*entry),
-			locks: make(map[string]*perKeyLock),
-		}
-	}
-
-	if sc.janIntv > 0 {
-		go sc.runJanitor(cfg.ctx)
-	}
-
 	return &rdbms{
 		db:    db,
-		sc:    sc,
 		hooks: cfg.hooks,
 	}
 }
@@ -203,7 +182,7 @@ func (r *rdbms) DoTxContext(ctx context.Context, opt *sql.TxOptions, fn func(ctx
 	}
 
 	// Child context bound to this tx
-	child := &rdbms{db: r.db, sc: r.sc, tx: tx, hooks: r.hooks}
+	child := &rdbms{db: r.db, tx: tx, hooks: r.hooks}
 
 	defer func() {
 		if p := recover(); p != nil {
@@ -229,9 +208,9 @@ func (r *rdbms) DoTxContext(ctx context.Context, opt *sql.TxOptions, fn func(ctx
 
 // Close releases all cached statements across all shards and close db.
 func (c *rdbms) Close() error {
-	c.sc.close()
 	return c.db.Close()
 }
+
 func (c *rdbms) Ping(ctx context.Context) error {
 	return c.db.PingContext(ctx)
 }

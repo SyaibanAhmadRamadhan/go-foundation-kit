@@ -88,6 +88,7 @@ func (h *ChiHelper) MustShouldBindJSON(w http.ResponseWriter, r *http.Request, s
 
 	return true, r
 }
+
 func (h *ChiHelper) SetError(r *http.Request, err error) *http.Request {
 	if err == nil {
 		return r
@@ -215,7 +216,7 @@ func (h *ChiHelper) BindToPaginationInput(r *http.Request) primitive.PaginationI
 	}
 }
 
-func (h *ChiHelper) parseInt64OrDefault(s string, def int64) int64 {
+func (h *ChiHelper) ParseInt64OrDefault(s string, def int64) int64 {
 	if s == "" {
 		return def
 	}

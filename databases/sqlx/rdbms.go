@@ -18,7 +18,6 @@ type RDBMS interface {
 	ReadQuery
 	WriterCommand
 	queryExecutor
-	StmtExecutor
 	Close() error
 	Ping(ctx context.Context) error
 }
@@ -36,16 +35,14 @@ type ReadQuery interface {
 // WriterCommandSquirrel defines write operations using Squirrel SQL builders.
 type WriterCommandSquirrel interface {
 	// ExecSq executes a write query (INSERT, UPDATE, DELETE) built with Squirrel.
-	// If useStmt = true, the query will be executed as a prepared statement.
-	ExecSq(ctx context.Context, query squirrel.Sqlizer, useStmt bool) (sql.Result, error)
+	ExecSq(ctx context.Context, query squirrel.Sqlizer) (sql.Result, error)
 }
 
 // ReadQuerySquirrel defines read operations using Squirrel SQL builders.
 type ReadQuerySquirrel interface {
 	// QuerySq executes a SELECT query built with Squirrel and processes multiple rows.
 	// The provided callback fn will be called with the result set.
-	// If useStmt = true, the query will be executed as a prepared statement.
-	QuerySq(ctx context.Context, query squirrel.Sqlizer, useStmt bool, fn func(rows *sql.Rows) error) error
+	QuerySq(ctx context.Context, query squirrel.Sqlizer, fn func(rows *sql.Rows) error) error
 
 	// QuerySqPagination executes a paginated SELECT query built with Squirrel.
 	// countQuery is used to count total rows, and query is the actual SELECT statement.
@@ -55,15 +52,13 @@ type ReadQuerySquirrel interface {
 		ctx context.Context,
 		countQuery squirrel.SelectBuilder,
 		query squirrel.SelectBuilder,
-		useStmt bool,
 		paginationInput primitive.PaginationInput,
 		fn func(rows *sql.Rows) error,
 	) (primitive.PaginationOutput, error)
 
 	// QueryRowSq executes a SELECT query built with Squirrel and returns a single row.
 	// If no rows are found, sql.ErrNoRows is returned.
-	// If useStmt = true, the query will be executed as a prepared statement.
-	QueryRowSq(ctx context.Context, query squirrel.Sqlizer, useStmt bool) (*sql.Row, error)
+	QueryRowSq(ctx context.Context, query squirrel.Sqlizer) (*sql.Row, error)
 }
 
 // queryExecutor defines low-level query execution using raw SQL strings.
@@ -81,18 +76,6 @@ type queryExecutor interface {
 
 	// PrepareContext creates a prepared statement for later executions.
 	PrepareContext(ctx context.Context, query string) (*sql.Stmt, error)
-}
-
-// StmtExecutor defines query execution using prepared statements.
-type StmtExecutor interface {
-	// QueryStmtContext executes a prepared statement that returns multiple rows.
-	QueryStmtContext(ctx context.Context, query string, args ...any) (*sql.Rows, error)
-
-	// QueryRowStmtContext executes a prepared statement that returns a single row.
-	QueryRowStmtContext(ctx context.Context, query string, args ...any) (*sql.Row, error)
-
-	// ExecStmtContext executes a prepared statement for write operations.
-	ExecStmtContext(ctx context.Context, query string, args ...any) (sql.Result, error)
 }
 
 // Tx defines transactional operations on the database.

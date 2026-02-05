@@ -16,7 +16,6 @@ require (
 	github.com/jackc/pgx/v5 v5.7.5
 	github.com/knadh/koanf/maps v0.1.2
 	github.com/knadh/koanf/v2 v2.2.2
-	github.com/lib/pq v1.10.9
 	github.com/nats-io/nats.go v1.44.0
 	github.com/rs/zerolog v1.34.0
 	github.com/segmentio/kafka-go v0.4.48
