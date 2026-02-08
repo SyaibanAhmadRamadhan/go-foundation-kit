@@ -22,6 +22,7 @@ type ValidationError struct {
 //
 // Parameters:
 //   - err: the original error returned by validator.Validate.Struct(...)
+//   - lang: the language code for translation, only available for id and en
 //
 // Returns:
 //   - []ValidationError: a slice of structured validation errors, or nil if the input error is not a validation error.
@@ -29,14 +30,18 @@ type ValidationError struct {
 // Notes:
 //   - Each ValidationError includes the field name and a translated message.
 //   - It uses the global `TranslatorID`, which must be previously initialized with a language translator.
-func ParseValidationErrors(err error) []ValidationError {
+func ParseValidationErrors(err error, lang string) []ValidationError {
+	translator := TranslatorID
+	if lang == "en" {
+		translator = TranslatorEn
+	}
 	var ve validator.ValidationErrors
 	if errors.As(err, &ve) {
 		var result []ValidationError
 		for _, e := range ve {
 			result = append(result, ValidationError{
 				Field:   e.Field(),
-				Message: e.Translate(TranslatorID),
+				Message: e.Translate(translator),
 			})
 		}
 		return result

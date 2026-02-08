@@ -74,7 +74,7 @@ func (h *ChiHelper) MustShouldBindJSON(w http.ResponseWriter, r *http.Request, s
 		if errors.As(err, &verr) {
 			Write(w, http.StatusBadRequest, "application/json", map[string]any{
 				h.keyJsonMessage:     "Validation error",
-				h.keyErrorValidation: validatorx.ParseValidationErrors(verr),
+				h.keyErrorValidation: validatorx.ParseValidationErrors(verr, "id"),
 			})
 			return false, r
 		}

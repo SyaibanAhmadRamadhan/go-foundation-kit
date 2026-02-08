@@ -54,7 +54,7 @@ func (h *GinHelper) MustShouldBind(c *gin.Context, req any) bool {
 		if errors.As(err, &verr) {
 			c.JSON(http.StatusBadRequest, map[string]any{
 				h.keyJsonMessage:     "Validation error",
-				h.keyErrorValidation: validatorx.ParseValidationErrors(verr),
+				h.keyErrorValidation: validatorx.ParseValidationErrors(verr, "id"),
 			})
 			return false
 		}
@@ -72,7 +72,7 @@ func (h *GinHelper) MustShouldBind(c *gin.Context, req any) bool {
 		if errors.As(err, &verr) {
 			c.JSON(http.StatusBadRequest, map[string]any{
 				h.keyJsonMessage:     "Validation error",
-				h.keyErrorValidation: validatorx.ParseValidationErrors(verr),
+				h.keyErrorValidation: validatorx.ParseValidationErrors(verr, "id"),
 			})
 			return false
 		}

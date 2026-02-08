@@ -45,7 +45,7 @@ func MustShouldBindJSON(w http.ResponseWriter, r *http.Request, src any) (bool, 
 		if errors.As(err, &verr) {
 			Write(w, http.StatusBadRequest, "application/json", map[string]any{
 				"message":           "Validation error",
-				"error_validations": validatorx.ParseValidationErrors(verr),
+				"error_validations": validatorx.ParseValidationErrors(verr, "id"),
 			})
 			return false, r
 		}
@@ -59,6 +59,7 @@ func MustShouldBindJSON(w http.ResponseWriter, r *http.Request, src any) (bool, 
 
 	return true, r
 }
+
 func SetError(r *http.Request, err error) *http.Request {
 	if err == nil {
 		return r
