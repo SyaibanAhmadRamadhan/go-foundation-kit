@@ -1,6 +1,10 @@
-package builder
+package filter
 
-import "fmt"
+import (
+	"fmt"
+
+	"github.com/Masterminds/squirrel"
+)
 
 // StringFilter represents a fluent filter builder for string columns in SQL queries.
 // Use New() to create an instance and chain methods to build filter conditions.
@@ -256,4 +260,93 @@ func (f *StringFilter) Build() (condition string, args []any) {
 	}
 
 	return condition, args
+}
+
+func (f *StringFilter) BuildSquirrel() (squirrel.Sqlizer, error) {
+	where := make([]squirrel.Sqlizer, 0)
+
+	// IS NULL / IS NOT NULL
+	if f.isNull {
+		where = append(where, squirrel.Expr(f.column+" IS NULL"))
+	}
+	if f.isNotNull {
+		where = append(where, squirrel.Expr(f.column+" IS NOT NULL"))
+	}
+
+	// = / <>
+	if f.eqValue != nil {
+		where = append(where, squirrel.Eq{f.column: *f.eqValue})
+	}
+	if f.neqValue != nil {
+		where = append(where, squirrel.NotEq{f.column: *f.neqValue})
+	}
+
+	// LIKE / NOT LIKE
+	if f.likeValue != nil {
+		where = append(where, squirrel.Like{f.column: *f.likeValue})
+	}
+	if f.notLikeValue != nil {
+		where = append(where, squirrel.NotLike{f.column: *f.notLikeValue})
+	}
+
+	// ILIKE / NOT ILIKE (Postgres)
+	if f.iLikeValue != nil {
+		where = append(where, squirrel.ILike{f.column: *f.iLikeValue})
+	}
+	if f.notILikeValue != nil {
+		where = append(where, squirrel.NotILike{f.column: *f.notILikeValue})
+	}
+
+	// IN / NOT IN
+	if len(f.inValues) > 0 {
+		// kalau inValues tipe []string
+		vals := make([]any, 0, len(f.inValues))
+		for _, v := range f.inValues {
+			vals = append(vals, v)
+		}
+		where = append(where, squirrel.Eq{f.column: vals})
+	}
+	if len(f.notInValues) > 0 {
+		vals := make([]any, 0, len(f.notInValues))
+		for _, v := range f.notInValues {
+			vals = append(vals, v)
+		}
+		where = append(where, squirrel.NotEq{f.column: vals}) // NotEq + slice => NOT IN
+	}
+
+	if f.gtValue != nil {
+		where = append(where, squirrel.Gt{f.column: *f.gtValue})
+	}
+	if f.ltValue != nil {
+		where = append(where, squirrel.Lt{f.column: *f.ltValue})
+	}
+	if f.gteValue != nil {
+		where = append(where, squirrel.GtOrEq{f.column: *f.gteValue})
+	}
+	if f.lteValue != nil {
+		where = append(where, squirrel.LtOrEq{f.column: *f.lteValue})
+	}
+
+	// BETWEEN / NOT BETWEEN
+	if f.betweenStart != nil && f.betweenEnd != nil {
+		if f.notBetween {
+			where = append(where, squirrel.Or{
+				squirrel.Gt{f.column: *f.betweenStart},
+				squirrel.Lt{f.column: *f.betweenEnd},
+			})
+		} else {
+			where = append(where, squirrel.And{
+				squirrel.GtOrEq{f.column: *f.betweenStart},
+				squirrel.LtOrEq{f.column: *f.betweenEnd},
+			})
+		}
+	}
+
+	// kalau kosong, return nil (caller bisa skip Where)
+	if len(where) == 0 {
+		return nil, nil
+	}
+
+	// gabung dengan AND
+	return squirrel.And(where), nil
 }

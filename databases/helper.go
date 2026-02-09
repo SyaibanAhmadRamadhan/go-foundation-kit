@@ -1,20 +1,21 @@
 package databases
 
-import (
-	"regexp"
-	"strings"
-)
+import "fmt"
 
-var (
-	spaceRe   = regexp.MustCompile(`\s+`)
-	escWSRe   = regexp.MustCompile(`\\[ntr]`) // literal "\n", "\t", "\r"
-	commentRe = regexp.MustCompile(`--.*?$|/\*.*?\*/`)
-)
+func QuestionToDollar(sql string) string {
+	var (
+		idx int = 1
+		out     = make([]rune, 0, len(sql))
+	)
 
-func NormalizeSQL(sql string) string {
-	s := escWSRe.ReplaceAllString(sql, " ")
-	s = commentRe.ReplaceAllString(s, " ")
-	s = strings.TrimSpace(s)
-	s = spaceRe.ReplaceAllString(s, " ")
-	return s
+	for i := 0; i < len(sql); i++ {
+		if sql[i] == '?' {
+			out = append(out, []rune(fmt.Sprintf("$%d", idx))...)
+			idx++
+		} else {
+			out = append(out, rune(sql[i]))
+		}
+	}
+
+	return string(out)
 }

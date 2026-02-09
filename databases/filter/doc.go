@@ -27,7 +27,7 @@
 // = ANY()         Equal any (Postgres array)              EqAny      WHERE 5 = ANY(numbers)
 // = ALL()         Equal all                               EqAll      WHERE score = ALL(scores)
 
-package builder
+package filter
 
 // See each operator's implementation in this package for usage details
 // and examples. The methods named above (Eq, Neq, Gt, Lt, etc.) are
