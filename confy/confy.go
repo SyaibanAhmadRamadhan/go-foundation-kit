@@ -28,6 +28,9 @@ func New[T any](opts ...Option) (*Loader[T], error) {
 		delimiter: ".",
 		tag:       "koanf",
 	}
+	for _, opt := range opts {
+		opt(&o)
+	}
 
 	k := koanf.New(o.delimiter)
 
