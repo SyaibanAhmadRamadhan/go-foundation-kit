@@ -84,9 +84,9 @@ type Echox struct {
 func New(conf Config) *Echox {
 	e := echo.New()
 
+	e.Use(log(conf.BlacklistRouteLogResponse, conf.SensitiveFields))
 	e.Use(emiddleware.Recover())
 	e.Use(emiddleware.CORSWithConfig(conf.CorsConfig))
-	e.Use(log(conf.BlacklistRouteLogResponse, conf.SensitiveFields))
 
 	// Register health check endpoint if health checks are provided
 	if len(conf.HealthChecks) > 0 {
