@@ -74,20 +74,15 @@ func WithNow(fn func() time.Time) Option {
 }
 
 // New membuat instance baru JWT dengan konfigurasi yang diberikan.
-// JWT akan menggunakan enkripsi AES untuk melindungi token string dan
 // signer untuk signing/verifikasi token.
 //
 // Parameters:
-//   - keyEncrypt: key untuk enkripsi/dekripsi token string menggunakan AES-CFB (required jika encrypted=true)
 //   - signer: implementasi Signer untuk signing dan verifikasi token
-//   - opts: option functions untuk konfigurasi tambahan (issuer, now function, encrypted flag, dll)
+//   - opts: option functions untuk konfigurasi tambahan (issuer, now function, dll)
 //
 // Returns:
 //   - *JWT: instance JWT yang siap digunakan
-//
-// Panics:
-//   - jika encrypted=true (default) dan keyEncrypt kosong
-func New(keyEncrypt string, signer Signer, opts ...Option) *JWT {
+func New(signer Signer, opts ...Option) *JWT {
 	j := &JWT{
 		issuer: "PLATFORM-AUTH-API",
 		signer: signer,
