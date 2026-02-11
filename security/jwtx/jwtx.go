@@ -84,7 +84,7 @@ func WithNow(fn func() time.Time) Option {
 //   - *JWT: instance JWT yang siap digunakan
 func New(signer Signer, opts ...Option) *JWT {
 	j := &JWT{
-		issuer: "PLATFORM-AUTH-API",
+		issuer: "GO-FOUNDATION-JWT",
 		signer: signer,
 		now:    time.Now().UTC,
 	}
