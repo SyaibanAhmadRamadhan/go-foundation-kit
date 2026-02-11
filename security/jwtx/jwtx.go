@@ -61,18 +61,6 @@ func WithIssuer(issuer string) Option {
 	return func(j *JWT) { j.issuer = issuer }
 }
 
-// WithNow adalah option function untuk mengatur fungsi penyedia waktu.
-// Berguna untuk testing dengan waktu yang bisa dikontrol.
-//
-// Parameters:
-//   - fn: fungsi yang mengembalikan waktu sekarang
-//
-// Returns:
-//   - Option: function yang akan mengatur time provider pada JWT instance
-func WithNow(fn func() time.Time) Option {
-	return func(j *JWT) { j.now = fn }
-}
-
 // New membuat instance baru JWT dengan konfigurasi yang diberikan.
 // signer untuk signing/verifikasi token.
 //
@@ -86,7 +74,6 @@ func New(signer Signer, opts ...Option) *JWT {
 	j := &JWT{
 		issuer: "GO-FOUNDATION-JWT",
 		signer: signer,
-		now:    time.Now().UTC,
 	}
 	for _, o := range opts {
 		o(j)
@@ -107,7 +94,7 @@ func New(signer Signer, opts ...Option) *JWT {
 //   - RespToken: response berisi access token yang sudah dienkripsi dan waktu expiry
 //   - error: error jika terjadi kesalahan saat signing atau enkripsi
 func (j *JWT) CreateToken(data map[string]any, subject string, ttlSeconds int64) (RespToken, error) {
-	now := j.now()
+	now := time.Now().UTC()
 	exp := now.Add(time.Duration(ttlSeconds) * time.Second)
 
 	claims := EzClaims{
