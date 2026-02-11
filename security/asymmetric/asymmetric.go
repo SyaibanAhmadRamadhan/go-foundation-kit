@@ -2,6 +2,7 @@ package asymmetric
 
 import (
 	"crypto/x509"
+	"encoding/base64"
 	"encoding/pem"
 	"fmt"
 )
@@ -114,4 +115,48 @@ func BytesToPublicKeyGeneric[T any](pemBytes []byte) (T, error) {
 	}
 
 	return key, nil
+}
+
+// Base64ToPrivateKeyGeneric decodes a base64-encoded private key string into a concrete private key type.
+//
+// Type Parameters:
+//   - T: the expected private key type (e.g., *rsa.PrivateKey, *ecdsa.PrivateKey).
+//
+// Parameters:
+//   - key: the base64-encoded private key string.
+//
+// Returns:
+//   - the decoded private key of type T
+//   - error if decoding or type assertion fails
+func Base64ToPrivateKeyGeneric[T any](key string) (T, error) {
+	var zero T
+
+	decoded, err := base64.StdEncoding.DecodeString(key)
+	if err != nil {
+		return zero, err
+	}
+
+	return BytesToPrivateKeyGeneric[T](decoded)
+}
+
+// Base64ToPublicKeyGeneric decodes a base64-encoded public key string into a concrete public key type.
+//
+// Type Parameters:
+//   - T: the expected public key type (e.g., *rsa.PublicKey, *ecdsa.PublicKey).
+//
+// Parameters:
+//   - key: the base64-encoded public key string.
+//
+// Returns:
+//   - the decoded public key of type T
+//   - error if decoding or type assertion fails
+func Base64ToPublicKeyGeneric[T any](key string) (T, error) {
+	var zero T
+
+	decoded, err := base64.StdEncoding.DecodeString(key)
+	if err != nil {
+		return zero, err
+	}
+
+	return BytesToPublicKeyGeneric[T](decoded)
 }
