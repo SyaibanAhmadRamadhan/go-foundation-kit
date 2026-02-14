@@ -1,9 +1,12 @@
 package echox
 
 import (
+	"bufio"
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"strings"
 
@@ -26,6 +29,27 @@ func (w bodyLogWriter) Write(b []byte) (int, error) {
 func (w *bodyLogWriter) WriteHeader(statusCode int) {
 	w.statusCode = statusCode
 	w.ResponseWriter.WriteHeader(statusCode)
+}
+
+func (w *bodyLogWriter) Flush() {
+	if f, ok := w.ResponseWriter.(http.Flusher); ok {
+		f.Flush()
+	}
+}
+
+func (w *bodyLogWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
+	h, ok := w.ResponseWriter.(http.Hijacker)
+	if !ok {
+		return nil, nil, fmt.Errorf("hijacker not supported")
+	}
+	return h.Hijack()
+}
+
+func (w *bodyLogWriter) Push(target string, opts *http.PushOptions) error {
+	if p, ok := w.ResponseWriter.(http.Pusher); ok {
+		return p.Push(target, opts)
+	}
+	return http.ErrNotSupported
 }
 
 func redactSensitiveFields(data map[string]any, sensitiveFields map[string]struct{}) {
