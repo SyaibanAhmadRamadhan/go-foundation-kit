@@ -11,7 +11,7 @@ func WithPublicMessage(msg string) Option {
 
 func WithStack() Option {
 	return func(e *Error) {
-		e.Stack = PrettyStack("/apperror.", e.Stack)
+		e.Stack = Stack()
 	}
 }
 

@@ -273,18 +273,19 @@ func (h *EchoxHelper) ErrorResponse(c *echo.Context, err error) error {
 	apperr, ok := apperror.As(err)
 	httpCode := http.StatusInternalServerError
 	msg := "Internal server error"
-	stack := ""
 	if ok {
 		httpCode = apperr.Code.ToHTTPCode()
 		msg = apperr.PublicMessage
-		stack = apperr.Stack
+		c.Set(errKeyValue, apperr.PrettyErrorStack())
+	} else {
+		c.Set(errKeyValue, err.Error())
 	}
-	c.Set(errKeyValue, err.Error())
 
 	if h.DebugMode {
+		stackmsg := apperr.PrettyErrorStack()
 		return c.JSON(httpCode, map[string]any{
 			h.keyJsonMessage: msg,
-			"stack":          stackToSlice(stack),
+			"stack":          stackToSlice(stackmsg),
 		})
 	} else {
 		return c.JSON(httpCode, map[string]string{

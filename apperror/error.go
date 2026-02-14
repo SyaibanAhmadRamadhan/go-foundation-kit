@@ -51,6 +51,20 @@ func (e *Error) Error() string {
 	return msg
 }
 
+func (e *Error) PrettyErrorStack() string {
+	msg := PrettyExistingStack(
+		[]string{
+			"github.com/SyaibanAhmadRamadhan/go-foundation-kit/apperror",
+			"github.com/labstack/echo/v5",
+			"github.com/SyaibanAhmadRamadhan/go-foundation-kit/http/server",
+			"net/http.serverHandler.ServeHTTP",
+			"net/http.(*conn).serve",
+		}, e.Message,
+	)
+
+	return msg
+}
+
 func New(code Code, internalMsg string, opts ...Option) error {
 	e := &Error{
 		Message: internalMsg,

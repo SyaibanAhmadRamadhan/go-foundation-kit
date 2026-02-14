@@ -16,7 +16,11 @@ func Stack() string {
 	frames := runtime.CallersFrames(pcs[:n])
 	for {
 		frame, more := frames.Next()
-		fmt.Fprintf(&b, "%s\n\t%s:%d\n", frame.Function, frame.File, frame.Line)
+		fmt.Fprintf(&b, "  %s\n    %s:%d\n",
+			frame.Function,
+			filepath.Base(frame.File),
+			frame.Line,
+		)
 		if !more {
 			break
 		}
@@ -58,7 +62,7 @@ func Pretty() string {
 	return strings.Join(out, "\n")
 }
 
-func PrettyStack(skipPkg string, existingStack string) string {
+func PrettyStack(skipPkgs []string, existingStack string) string {
 	const depth = 32
 
 	pcs := make([]uintptr, depth)
@@ -66,6 +70,7 @@ func PrettyStack(skipPkg string, existingStack string) string {
 	frames := runtime.CallersFrames(pcs[:n])
 
 	var b strings.Builder
+Outer:
 	for {
 		f, more := frames.Next()
 
@@ -78,11 +83,13 @@ func PrettyStack(skipPkg string, existingStack string) string {
 		}
 
 		// skip internal package
-		if strings.Contains(f.Function, skipPkg) {
-			if !more {
-				break
+		for _, v := range skipPkgs {
+			if strings.Contains(f.Function, v) {
+				if !more {
+					break Outer
+				}
+				continue Outer
 			}
-			continue
 		}
 
 		fmt.Fprintf(&b, "  %s\n    %s:%d\n",
@@ -110,6 +117,79 @@ func PrettyStack(skipPkg string, existingStack string) string {
 		return existingStack
 	}
 
-	fmt.Println("debug")
 	return newStack + "\n"
+}
+
+func PrettyExistingStack(skipPkgs []string, existingStack string) string {
+	existingStack = strings.TrimSpace(existingStack)
+	if existingStack == "" {
+		return ""
+	}
+
+	// normalize: split, trim, buang empty
+	raw := strings.Split(existingStack, "\n")
+	lines := make([]string, 0, len(raw))
+	for _, s := range raw {
+		s = strings.TrimSpace(s)
+		if s == "" {
+			continue
+		}
+		lines = append(lines, s)
+	}
+
+	shouldSkip := func(fn string) bool {
+		if fn == "" {
+			return true
+		}
+		if strings.HasPrefix(fn, "runtime.") {
+			return true
+		}
+		for _, p := range skipPkgs {
+			p = strings.TrimSpace(p)
+			if p == "" {
+				continue
+			}
+			if strings.Contains(fn, p) {
+				return true
+			}
+		}
+		return false
+	}
+
+	var b strings.Builder
+
+	// parse in pairs: [func, file]
+	for i := 0; i < len(lines); {
+		fn := lines[i]
+		file := ""
+		if i+1 < len(lines) {
+			file = lines[i+1]
+		}
+
+		// heuristik: kalau "file" ternyata bukan file:line, tetap treat sebagai func saja
+		isFileLine := file != "" && (strings.Contains(file, ".go:") || strings.Contains(file, ":"))
+		if !isFileLine {
+			// single line frame (fallback)
+			if !shouldSkip(fn) {
+				b.WriteString("  ")
+				b.WriteString(fn)
+				b.WriteString("\n")
+			}
+			i++
+			continue
+		}
+
+		// normal pair
+		if !shouldSkip(fn) {
+			b.WriteString("  ")
+			b.WriteString(fn)
+			b.WriteString("\n    ")
+			b.WriteString(file)
+			b.WriteString("\n")
+		}
+
+		i += 2
+	}
+
+	return b.String()
 }
