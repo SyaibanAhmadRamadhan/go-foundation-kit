@@ -282,15 +282,29 @@ func (h *EchoxHelper) ErrorResponse(c *echo.Context, err error) error {
 	c.Set(errKeyValue, err.Error())
 
 	if h.DebugMode {
-		return c.JSON(httpCode, map[string]string{
+		return c.JSON(httpCode, map[string]any{
 			h.keyJsonMessage: msg,
-			"stack":          stack,
+			"stack":          stackToSlice(stack),
 		})
 	} else {
 		return c.JSON(httpCode, map[string]string{
 			h.keyJsonMessage: msg,
 		})
 	}
+}
+
+func stackToSlice(stack string) []string {
+	lines := strings.Split(stack, "\n")
+
+	out := make([]string, 0, len(lines))
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		out = append(out, line)
+	}
+	return out
 }
 
 // QueryParamsToRangeDatePtr parses a date range query parameter into time pointers.
