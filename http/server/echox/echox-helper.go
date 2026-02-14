@@ -66,6 +66,7 @@ func NewEchoxHelper(jsonMessage string, errorValidation string, maxPageSize int6
 		keyJsonMessage:     jsonMessage,
 		keyErrorValidation: errorValidation,
 		MaxPageSize:        maxPageSize,
+		DebugMode:          debugMode,
 	}
 }
 
