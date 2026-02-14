@@ -20,7 +20,7 @@ import (
 // defaultEchoxHelper is the default instance of EchoxHelper used by the Helper() function.
 // It uses "message" as the JSON message key, "error_validations" as the validation error key,
 // and 25 as the maximum page size.
-var defaultEchoxHelper = NewEchoxHelper("message", "error_validations", 25)
+var defaultEchoxHelper = NewEchoxHelper("message", "error_validations", 25, false)
 
 // Helper returns the default EchoxHelper instance.
 // This provides a convenient way to use EchoxHelper without creating a new instance.
@@ -41,6 +41,8 @@ type EchoxHelper struct {
 	keyErrorValidation string
 	// MaxPageSize is the maximum number of items per page for pagination
 	MaxPageSize int64
+
+	DebugMode bool
 }
 
 // NewEchoxHelper creates a new instance of EchoxHelper with custom configuration.
@@ -56,7 +58,7 @@ type EchoxHelper struct {
 // Example:
 //
 //	helper := NewEchoxHelper("msg", "errors", 50)
-func NewEchoxHelper(jsonMessage string, errorValidation string, maxPageSize int64) *EchoxHelper {
+func NewEchoxHelper(jsonMessage string, errorValidation string, maxPageSize int64, debugMode bool) *EchoxHelper {
 	if maxPageSize == 0 {
 		maxPageSize = 25 // default value
 	}
@@ -270,15 +272,24 @@ func (h *EchoxHelper) ErrorResponse(c *echo.Context, err error) error {
 	apperr, ok := apperror.As(err)
 	httpCode := http.StatusInternalServerError
 	msg := "Internal server error"
+	stack := ""
 	if ok {
 		httpCode = apperr.Code.ToHTTPCode()
 		msg = apperr.PublicMessage
+		stack = apperr.Stack
 	}
 	c.Set(errKeyValue, err.Error())
 
-	return c.JSON(httpCode, map[string]string{
-		h.keyJsonMessage: msg,
-	})
+	if h.DebugMode {
+		return c.JSON(httpCode, map[string]string{
+			h.keyJsonMessage: msg,
+			"stack":          stack,
+		})
+	} else {
+		return c.JSON(httpCode, map[string]string{
+			h.keyJsonMessage: msg,
+		})
+	}
 }
 
 // QueryParamsToRangeDatePtr parses a date range query parameter into time pointers.
