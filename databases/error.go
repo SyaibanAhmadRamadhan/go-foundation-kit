@@ -23,24 +23,50 @@ var ErrNoDeleteRow = errors.New("no rows were deleted")
 // such as attempting to insert a duplicate value into a column that requires unique values.
 var ErrDuplicateEntry = errors.New("duplicate entry")
 
-// MapDuplicateEntryError inspects the provided error and maps it to ErrDuplicateEntry
+// ErrForeignKeyViolation is returned when an operation violates a foreign key constraint,
+// such as attempting to insert or update a row with a foreign key value that does not exist in the referenced table.
+var ErrForeignKeyViolation = errors.New("foreign key constraint violation")
+
+// IsDuplicateEntryError inspects the provided error and maps it to ErrDuplicateEntry
 // if it corresponds to a duplicate entry error from either PostgreSQL or MySQL.
 // If the error does not indicate a duplicate entry, it is returned unchanged.
-func MapDuplicateEntryError(err error) error {
+func IsDuplicateEntryError(err error) bool {
 	if err == nil {
-		return nil
+		return false
 	}
 
 	var pgErr *pgconn.PgError
 	if errors.As(err, &pgErr) {
 		if pgErr.Code == "23505" {
-			return ErrDuplicateEntry
+			return true
 		}
 	}
 
 	var mysqlErr *mysql.MySQLError
 	if errors.As(err, &mysqlErr) && mysqlErr.Number == 1062 {
-		return ErrDuplicateEntry
+		return true
 	}
-	return err
+	return false
+}
+
+// IsForeignKeyViolationError inspects the provided error and returns true
+// if it corresponds to a foreign key constraint violation from either PostgreSQL or MySQL.
+// PostgreSQL error code: 23503, MySQL error code: 1452
+func IsForeignKeyViolationError(err error) bool {
+	if err == nil {
+		return false
+	}
+
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) {
+		if pgErr.Code == "23503" {
+			return true
+		}
+	}
+
+	var mysqlErr *mysql.MySQLError
+	if errors.As(err, &mysqlErr) && mysqlErr.Number == 1452 {
+		return true
+	}
+	return false
 }

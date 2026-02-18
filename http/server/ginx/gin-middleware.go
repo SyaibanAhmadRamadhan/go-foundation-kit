@@ -3,6 +3,7 @@ package ginx
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"slices"
@@ -45,7 +46,27 @@ func redactSensitiveFields(data map[string]any, sensitive map[string]struct{}) {
 	}
 }
 
+func truncateBodyLog(body map[string]any, maxSize int) any {
+	if len(body) == 0 {
+		return nil
+	}
+
+	jsonBytes, err := json.Marshal(body)
+	if err != nil {
+		return body
+	}
+
+	if len(jsonBytes) <= maxSize {
+		return body
+	}
+
+	truncated := string(jsonBytes[:maxSize])
+	return truncated + fmt.Sprintf("... [truncated, total size: %d bytes]", len(jsonBytes))
+}
+
 func log(blacklistRouteLogResponse map[string]struct{}, sensitiveFields map[string]struct{}) gin.HandlerFunc {
+	const maxLogBodySize = 10 << 10 // 10KB - limit untuk log body
+
 	return func(c *gin.Context) {
 		method := c.Request.Method
 		path := c.FullPath()
@@ -108,10 +129,10 @@ func log(blacklistRouteLogResponse map[string]struct{}, sensitiveFields map[stri
 			e.Str("error", c.Errors.String())
 		}
 		if respBody != nil {
-			e.Any("response_body", respBody)
+			e.Any("response_body", truncateBodyLog(respBody, maxLogBodySize))
 		}
-		if reqBody != nil {
-			e.Any("request_body", reqBody)
+		if len(reqBody) > 0 {
+			e.Any("request_body", truncateBodyLog(reqBody, maxLogBodySize))
 		}
 		if len(reqQueryParams) > 0 {
 			e.Any("query_parameters", reqQueryParams)

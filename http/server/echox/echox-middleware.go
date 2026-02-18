@@ -73,8 +73,27 @@ func redactSensitiveFields(data map[string]any, sensitiveFields map[string]struc
 	}
 }
 
+func truncateBodyLog(body map[string]any, maxSize int) any {
+	if len(body) == 0 {
+		return nil
+	}
+
+	jsonBytes, err := json.Marshal(body)
+	if err != nil {
+		return body
+	}
+
+	if len(jsonBytes) <= maxSize {
+		return body
+	}
+
+	truncated := string(jsonBytes[:maxSize])
+	return truncated + fmt.Sprintf("... [truncated, total size: %d bytes]", len(jsonBytes))
+}
+
 func log(blacklistRouteLogResponse map[string]struct{}, sensitiveFields map[string]struct{}) echo.MiddlewareFunc {
-	const maxBodySize = 1 << 20 // 1MB
+	const maxBodySize = 1 << 20    // 1MB - limit untuk read body dari request
+	const maxLogBodySize = 4 << 10 // 10KB - limit untuk log body
 
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c *echo.Context) error {
@@ -160,10 +179,10 @@ func log(blacklistRouteLogResponse map[string]struct{}, sensitiveFields map[stri
 			}
 
 			if respBody != nil {
-				e.Any("response_body", respBody)
+				e.Any("response_body", truncateBodyLog(respBody, maxLogBodySize))
 			}
 			if reqBody != nil {
-				e.Any("request_body", reqBody)
+				e.Any("request_body", truncateBodyLog(reqBody, maxLogBodySize))
 			}
 			if len(reqQueryParams) > 0 {
 				e.Any("query_parameters", reqQueryParams)
