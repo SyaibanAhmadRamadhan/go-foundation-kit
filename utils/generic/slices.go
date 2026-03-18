@@ -87,14 +87,15 @@ func FilterSlice[T any](s []T, predicate func(T) bool) []T {
 // Example:
 //
 //	numbers := []int{1, 2, 2, 3, 3, 3}
-//	uniqueNumbers := UniqueSlice(numbers)
+//	uniqueNumbers := UniqueSlice(numbers, func(n int) int { return n })
 //	// uniqueNumbers => []int{1, 2, 3}
-func UniqueSlice[T comparable](s []T) []T {
+func UniqueSlice[T comparable](s []T, key func(T) T) []T {
 	seen := make(map[T]bool)
 	result := make([]T, 0)
 	for _, item := range s {
-		if !seen[item] {
-			seen[item] = true
+		k := key(item)
+		if !seen[k] {
+			seen[k] = true
 			result = append(result, item)
 		}
 	}
