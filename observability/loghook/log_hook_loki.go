@@ -6,9 +6,10 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
-	"os"
 	"sync"
 	"time"
+
+	"github.com/SyaibanAhmadRamadhan/go-foundation-kit/utils/generic"
 )
 
 // LokiPayload represents the payload structure required by Loki's push API.
@@ -32,6 +33,7 @@ type LokiHookConfig struct {
 	OnlySink          bool          // Flag if this hook is only used as sink
 	BatchInterval     time.Duration // Time interval for flushing logs
 	BatchMessageCount int           // Max number of logs per batch
+	LabelKey          []string
 }
 
 // lokiHook buffers log entries and pushes them to Loki in batches.
@@ -42,6 +44,7 @@ type lokiHook struct {
 	env         string
 	serviceName string
 	onlySink    bool
+	streamKey   []string
 
 	batchMessageCount int
 	mu                sync.Mutex
@@ -66,6 +69,19 @@ func NewLokiHook(cfg LokiHookConfig) (*lokiHook, func()) {
 		lokiStream:        make([]LokiStream, 0, cfg.BatchMessageCount),
 		stopChan:          make(chan struct{}),
 		ticker:            time.NewTicker(cfg.BatchInterval),
+		streamKey:         cfg.LabelKey,
+	}
+
+	streamKeyStd := []string{
+		"status_code", "status", "path", "method", "span_id", "trace_id",
+	}
+	if hook.streamKey == nil {
+		hook.streamKey = streamKeyStd
+	} else {
+		hook.streamKey = append(hook.streamKey, streamKeyStd...)
+		hook.streamKey = generic.UniqueSlice(hook.streamKey, func(s string) string {
+			return s
+		})
 	}
 
 	// Start background sender
@@ -100,30 +116,19 @@ func (w *lokiHook) Write(p []byte) (n int, err error) {
 	}
 
 	level := payload["level"]
-	statusCode := payload["status_code"]
-	spanID := payload["span_id"]
-	traceID := payload["trace_id"]
 	stream := map[string]string{
-		"app":   os.Getenv("APP_NAME"),
-		"env":   os.Getenv("APP_ENV"),
+		"app":   w.serviceName,
+		"env":   w.env,
 		"level": fmt.Sprintf("%v", level),
 	}
-	if statusCode != nil {
-		stream["status_code"] = fmt.Sprintf("%v", statusCode)
-	}
-	if spanID != nil {
-		stream["span_id"] = fmt.Sprintf("%v", spanID)
-	}
-	if traceID != nil {
-		stream["trace_id"] = fmt.Sprintf("%v", traceID)
-	}
 
-	if traceID == nil {
-		slog.Warn("LokiLogWriter: log entry missing trace_id",
-			slog.String("service", w.serviceName),
-			slog.String("env", w.env),
-			slog.Any("payload", payload),
-		)
+	for _, k := range w.streamKey {
+		if k == "env" || k == "app" || k == "level" {
+			continue
+		}
+		if v := payload[k]; v != nil {
+			stream[k] = fmt.Sprintf("%v", v)
+		}
 	}
 
 	now := time.Now().UnixNano()
