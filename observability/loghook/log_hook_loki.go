@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log/slog"
 	"net/http"
 	"sync"
@@ -120,13 +121,13 @@ func (w *lokiHook) Write(p []byte) (n int, err error) {
 
 	level := payload["level"]
 	stream := map[string]string{
-		"app":   w.serviceName,
-		"env":   w.env,
-		"level": fmt.Sprintf("%v", level),
+		"service": w.serviceName,
+		"env":     w.env,
+		"level":   fmt.Sprintf("%v", level),
 	}
 
 	for _, k := range w.streamKey {
-		if k == "env" || k == "app" || k == "level" {
+		if k == "env" || k == "service" || k == "level" {
 			continue
 		}
 		if v := payload[k]; v != nil {
@@ -134,7 +135,7 @@ func (w *lokiHook) Write(p []byte) (n int, err error) {
 		}
 	}
 	for k, v := range w.extraInfo {
-		if k == "env" || k == "app" || k == "level" {
+		if k == "env" || k == "service" || k == "level" {
 			continue
 		}
 		stream[k] = v
@@ -154,7 +155,7 @@ func (w *lokiHook) Write(p []byte) (n int, err error) {
 		w.flush()
 	}
 
-	return
+	return len(p), nil
 }
 
 // batchSender runs in background to flush logs periodically or on shutdown.
@@ -221,6 +222,19 @@ func (w *lokiHook) flush() {
 		return
 	}
 	defer resp.Body.Close()
+
+	if resp.StatusCode > 299 {
+		bytes, err := io.ReadAll(resp.Body)
+		if err != nil {
+			slog.Error("LokiLogWriter: failed to read response body",
+				slog.String("service", w.serviceName),
+				slog.String("env", w.env),
+				slog.Any("error", err),
+			)
+			return
+		}
+		fmt.Println(string(bytes))
+	}
 
 	w.lokiStream = w.lokiStream[:0]
 }

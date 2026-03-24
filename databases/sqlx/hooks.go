@@ -5,6 +5,9 @@ import (
 	"context"
 	"log/slog"
 	"time"
+
+	"github.com/SyaibanAhmadRamadhan/go-foundation-kit/observability"
+	"github.com/rs/zerolog"
 )
 
 // Op represents the type of database operation being executed.
@@ -55,6 +58,17 @@ type DBHook interface {
 	After(ctx context.Context, info *HookInfo)
 }
 
+type ObservabilityLogMode string
+
+const (
+	ObservabilityLogAll         ObservabilityLogMode = "all"
+	ObservabilityLogSlow        ObservabilityLogMode = "slow"
+	ObservabilityLogError       ObservabilityLogMode = "error"
+	ObservabilityLogSlowOrError ObservabilityLogMode = "slow_or_error"
+)
+
+const defaultObservabilitySlowThreshold = 500 * time.Millisecond
+
 type DebugHook struct {
 	WithArgs bool // If true, include SQL args in the log
 }
@@ -87,6 +101,93 @@ func (h *DebugHook) After(ctx context.Context, info *HookInfo) {
 
 	// Log as info
 	slog.LogAttrs(ctx, slog.LevelInfo, "[SQL]", attrs...)
+}
+
+type ObservabilityHook struct {
+	WithArgs      bool                 // If true, include SQL args in the log
+	Mode          ObservabilityLogMode // Controls which SQL operations are logged. Default: all.
+	SlowThreshold time.Duration        // Minimum duration treated as slow. Default: 500ms.
+}
+
+func (h *ObservabilityHook) Before(ctx context.Context, info *HookInfo) context.Context {
+	info.Start = time.Now()
+	return ctx
+}
+
+func (h *ObservabilityHook) After(ctx context.Context, info *HookInfo) {
+	info.End = time.Now()
+	dur := info.End.Sub(info.Start)
+	isSlow := dur >= h.slowThreshold()
+	hasErr := info.Err != nil
+	if !h.shouldLog(isSlow, hasErr) {
+		return
+	}
+
+	e := observability.Start(ctx, h.level(isSlow, hasErr)).
+		Str("op", string(info.Op)).
+		Bool("in_tx", info.InTx).
+		Bool("prepared", info.Prepared).
+		Dur("duration", dur).
+		Str("sql", info.SQL)
+
+	if info.CacheHit != nil {
+		e = e.Bool("cache_hit", *info.CacheHit)
+	}
+	if isSlow {
+		e = e.Bool("slow", true).
+			Dur("slow_threshold", h.slowThreshold())
+	}
+	if hasErr {
+		e = e.Str("err", info.Err.Error())
+	}
+	if info.Rows != nil {
+		e = e.Int64("rows", *info.Rows)
+	}
+	if h.WithArgs {
+		e = e.Interface("args", info.Args)
+	}
+
+	e.Msg("[SQL]")
+}
+
+func (h *ObservabilityHook) shouldLog(isSlow, hasErr bool) bool {
+	switch h.logMode() {
+	case ObservabilityLogSlow:
+		return isSlow
+	case ObservabilityLogError:
+		return hasErr
+	case ObservabilityLogSlowOrError:
+		return isSlow || hasErr
+	default:
+		return true
+	}
+}
+
+func (h *ObservabilityHook) level(isSlow, hasErr bool) zerolog.Level {
+	switch {
+	case hasErr:
+		return zerolog.ErrorLevel
+	case isSlow:
+		return zerolog.WarnLevel
+	default:
+		return zerolog.InfoLevel
+	}
+}
+
+func (h *ObservabilityHook) logMode() ObservabilityLogMode {
+	switch h.Mode {
+	case ObservabilityLogSlow, ObservabilityLogError, ObservabilityLogSlowOrError:
+		return h.Mode
+	default:
+		return ObservabilityLogAll
+	}
+}
+
+func (h *ObservabilityHook) slowThreshold() time.Duration {
+	if h.SlowThreshold > 0 {
+		return h.SlowThreshold
+	}
+	return defaultObservabilitySlowThreshold
 }
 
 func rowsPtrVal(p *int64) any {

@@ -109,3 +109,43 @@ func UseDebug(withArgs bool) Option {
 		WithArgs: withArgs,
 	})
 }
+
+type ObservabilityHookOption func(*ObservabilityHook)
+
+// UseObservability is a helper option to attach an ObservabilityHook for SQL logs.
+// By default it logs all SQL operations, without args, using a 500ms slow threshold.
+func UseObservability(opts ...ObservabilityHookOption) Option {
+	hook := &ObservabilityHook{
+		Mode:          ObservabilityLogAll,
+		SlowThreshold: defaultObservabilitySlowThreshold,
+	}
+
+	for _, opt := range opts {
+		if opt != nil {
+			opt(hook)
+		}
+	}
+
+	return UseHook(hook)
+}
+
+// WithObservabilityArgs configures whether SQL args are included in observability logs.
+func WithObservabilityArgs(withArgs bool) ObservabilityHookOption {
+	return func(h *ObservabilityHook) {
+		h.WithArgs = withArgs
+	}
+}
+
+// WithObservabilityMode configures which SQL operations are emitted to observability logs.
+func WithObservabilityMode(mode ObservabilityLogMode) ObservabilityHookOption {
+	return func(h *ObservabilityHook) {
+		h.Mode = mode
+	}
+}
+
+// WithObservabilitySlowThreshold configures the minimum duration treated as a slow SQL operation.
+func WithObservabilitySlowThreshold(d time.Duration) ObservabilityHookOption {
+	return func(h *ObservabilityHook) {
+		h.SlowThreshold = d
+	}
+}

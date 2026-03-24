@@ -9,6 +9,7 @@ import (
 	"net"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/SyaibanAhmadRamadhan/go-foundation-kit/observability"
 	"github.com/labstack/echo/v5"
@@ -148,7 +149,9 @@ func log(blacklistRouteLogResponse map[string]struct{}, sensitiveFields map[stri
 			}
 			c.SetResponse(blw)
 
+			start := time.Now()
 			err := next(c)
+			duration := time.Since(start)
 
 			// parse response body kalau perlu
 			if !blacklisted {
@@ -172,7 +175,8 @@ func log(blacklistRouteLogResponse map[string]struct{}, sensitiveFields map[stri
 			e := observability.Start(req.Context(), level).
 				Str("method", method).
 				Str("path", path).
-				Int("status_code", status)
+				Int("status_code", status).
+				Dur("duration", duration)
 
 			if err != nil {
 				e.Str("error", err.Error())
