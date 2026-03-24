@@ -199,7 +199,7 @@ func log(blacklistRouteLogResponse map[string]struct{}, sensitiveFields map[stri
 				}
 			}
 
-			e.Msg("HTTP Request")
+			e.Msg(fmt.Sprintf("HTTP Request: %s %s", method, path))
 			// status code yang benar
 
 			return err
