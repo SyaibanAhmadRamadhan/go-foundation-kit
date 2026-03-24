@@ -34,6 +34,7 @@ type LokiHookConfig struct {
 	BatchInterval     time.Duration // Time interval for flushing logs
 	BatchMessageCount int           // Max number of logs per batch
 	LabelKey          []string
+	ExtraInfo         map[string]string // Static extra labels, e.g. {"from":"primary_log"}
 }
 
 // lokiHook buffers log entries and pushes them to Loki in batches.
@@ -45,6 +46,7 @@ type lokiHook struct {
 	serviceName string
 	onlySink    bool
 	streamKey   []string
+	extraInfo   map[string]string
 
 	batchMessageCount int
 	mu                sync.Mutex
@@ -64,6 +66,7 @@ func NewLokiHook(cfg LokiHookConfig) (*lokiHook, func()) {
 		env:         cfg.Env,
 		serviceName: cfg.ServiceName,
 		onlySink:    cfg.OnlySink,
+		extraInfo:   cfg.ExtraInfo,
 
 		batchMessageCount: cfg.BatchMessageCount,
 		lokiStream:        make([]LokiStream, 0, cfg.BatchMessageCount),
@@ -129,6 +132,12 @@ func (w *lokiHook) Write(p []byte) (n int, err error) {
 		if v := payload[k]; v != nil {
 			stream[k] = fmt.Sprintf("%v", v)
 		}
+	}
+	for k, v := range w.extraInfo {
+		if k == "env" || k == "app" || k == "level" {
+			continue
+		}
+		stream[k] = v
 	}
 
 	now := time.Now().UnixNano()
