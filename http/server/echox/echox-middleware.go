@@ -101,6 +101,12 @@ func log(blacklistRouteLogResponse map[string]struct{}, sensitiveFields map[stri
 			req := c.Request()
 			res := c.Response()
 
+			if req.Method == http.MethodOptions &&
+				req.Header.Get(echo.HeaderOrigin) != "" &&
+				req.Header.Get(echo.HeaderAccessControlRequestMethod) != "" {
+				return next(c)
+			}
+
 			method := req.Method
 			path := c.Path()
 			key := method + ":" + path
