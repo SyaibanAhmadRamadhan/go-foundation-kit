@@ -92,7 +92,7 @@ func truncateBodyLog(body map[string]any, maxSize int) any {
 	return truncated + fmt.Sprintf("... [truncated, total size: %d bytes]", len(jsonBytes))
 }
 
-func log(blacklistRouteLogResponse map[string]struct{}, sensitiveFields map[string]struct{}) echo.MiddlewareFunc {
+func log(blacklistRouteLogResponse map[string]struct{}, sensitiveFields map[string]struct{}, skipLoggingPaths map[string]struct{}) echo.MiddlewareFunc {
 	const maxBodySize = 1 << 20    // 1MB - limit untuk read body dari request
 	const maxLogBodySize = 4 << 10 // 10KB - limit untuk log body
 
@@ -104,6 +104,11 @@ func log(blacklistRouteLogResponse map[string]struct{}, sensitiveFields map[stri
 			method := req.Method
 			path := c.Path()
 			key := method + ":" + path
+
+			_, skipLogging := skipLoggingPaths[key]
+			if skipLogging {
+				return next(c)
+			}
 
 			// Query params
 			queryParams := c.QueryParams()
@@ -199,7 +204,7 @@ func log(blacklistRouteLogResponse map[string]struct{}, sensitiveFields map[stri
 				}
 			}
 
-			e.Msg(fmt.Sprintf("HTTP Request: %s %s", method, path))
+			e.Msg(fmt.Sprintf("HTTP Request: %s", key))
 			// status code yang benar
 
 			return err

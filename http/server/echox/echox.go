@@ -26,9 +26,14 @@ type HealthCheckItem struct {
 // Config holds the configuration for creating a new Echox instance.
 type Config struct {
 	// BlacklistRouteLogResponse contains routes that should not log response body
+	// format: "METHOD:PATH"
 	BlacklistRouteLogResponse map[string]struct{}
 	// SensitiveFields contains field names that should be redacted from logs
+	// format: "METHOD:PATH"
 	SensitiveFields map[string]struct{}
+	// SkipLoggingPaths contains paths that should not be logged
+	// format: "METHOD:PATH"
+	SkipLoggingPaths map[string]struct{}
 	// AppName is the application name for OpenTelemetry tracing
 	AppName string
 	// CorsConfig is the CORS configuration for the Echo server
@@ -84,7 +89,7 @@ type Echox struct {
 func New(conf Config) *Echox {
 	e := echo.New()
 
-	e.Use(log(conf.BlacklistRouteLogResponse, conf.SensitiveFields))
+	e.Use(log(conf.BlacklistRouteLogResponse, conf.SensitiveFields, conf.SkipLoggingPaths))
 	e.Use(emiddleware.Recover())
 	e.Use(emiddleware.CORSWithConfig(conf.CorsConfig))
 
