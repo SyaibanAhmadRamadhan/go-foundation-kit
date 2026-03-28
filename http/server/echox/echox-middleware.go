@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/SyaibanAhmadRamadhan/go-foundation-kit/observability"
+	"github.com/google/uuid"
 	"github.com/labstack/echo/v5"
 	"github.com/rs/zerolog"
 )
@@ -100,6 +101,17 @@ func log(blacklistRouteLogResponse map[string]struct{}, sensitiveFields map[stri
 		return func(c *echo.Context) error {
 			req := c.Request()
 			res := c.Response()
+
+			requestID := req.Header.Get("X-Request-ID")
+			if requestID == "" {
+				requestID = req.Header.Get("X-Correlation-ID")
+			}
+			if requestID == "" {
+				requestID = uuid.NewString()
+			}
+
+			ctx := observability.SetRequestID(c.Request().Context(), requestID)
+			c.SetRequest(c.Request().WithContext(ctx))
 
 			if req.Method == http.MethodOptions &&
 				req.Header.Get(echo.HeaderOrigin) != "" &&
@@ -213,6 +225,7 @@ func log(blacklistRouteLogResponse map[string]struct{}, sensitiveFields map[stri
 			e.Msg(fmt.Sprintf("HTTP Request: %s", key))
 			// status code yang benar
 
+			c.Response().Header().Set("X-Request-ID", requestID)
 			return err
 		}
 	}

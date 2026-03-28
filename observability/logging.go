@@ -128,22 +128,35 @@ func Start(ctx context.Context, level zerolog.Level) *zerolog.Event {
 		spanID = spanContext.SpanID().String()
 	}
 
+	requestID, ok := ctx.Value(reqID).(string)
+	if !ok {
+		requestID = ""
+	}
+
 	switch level {
 	case zerolog.TraceLevel:
-		return log.Trace().Str("trace_id", traceID).Str("span_id", spanID)
+		return log.Trace().Str("trace_id", traceID).Str("span_id", spanID).Str("request_id", requestID)
 	case zerolog.DebugLevel:
-		return log.Debug().Str("trace_id", traceID).Str("span_id", spanID)
+		return log.Debug().Str("trace_id", traceID).Str("span_id", spanID).Str("request_id", requestID)
 	case zerolog.InfoLevel:
-		return log.Info().Str("trace_id", traceID).Str("span_id", spanID)
+		return log.Info().Str("trace_id", traceID).Str("span_id", spanID).Str("request_id", requestID)
 	case zerolog.WarnLevel:
-		return log.Warn().Str("trace_id", traceID).Str("span_id", spanID)
+		return log.Warn().Str("trace_id", traceID).Str("span_id", spanID).Str("request_id", requestID)
 	case zerolog.ErrorLevel:
-		return log.Error().Str("trace_id", traceID).Str("span_id", spanID)
+		return log.Error().Str("trace_id", traceID).Str("span_id", spanID).Str("request_id", requestID)
 	case zerolog.FatalLevel:
-		return log.Fatal().Str("trace_id", traceID).Str("span_id", spanID)
+		return log.Fatal().Str("trace_id", traceID).Str("span_id", spanID).Str("request_id", requestID)
 	case zerolog.PanicLevel:
-		return log.Panic().Str("trace_id", traceID).Str("span_id", spanID)
+		return log.Panic().Str("trace_id", traceID).Str("span_id", spanID).Str("request_id", requestID)
 	default:
-		return log.Info().Str("trace_id", traceID).Str("span_id", spanID)
+		return log.Info().Str("trace_id", traceID).Str("span_id", spanID).Str("request_id", requestID)
 	}
+}
+
+type requestID string
+
+const reqID requestID = "request_id"
+
+func SetRequestID(ctx context.Context, id string) context.Context {
+	return context.WithValue(ctx, reqID, id)
 }

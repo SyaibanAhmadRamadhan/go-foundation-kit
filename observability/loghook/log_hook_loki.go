@@ -77,7 +77,7 @@ func NewLokiHook(cfg LokiHookConfig) (*lokiHook, func()) {
 	}
 
 	streamKeyStd := []string{
-		"status_code", "status", "path", "method", "span_id", "trace_id",
+		"status_code", "status", "path", "method", "span_id", "trace_id", "request_id",
 	}
 	if hook.streamKey == nil {
 		hook.streamKey = streamKeyStd
