@@ -100,18 +100,19 @@ func log(blacklistRouteLogResponse map[string]struct{}, sensitiveFields map[stri
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c *echo.Context) error {
 			res := c.Response()
-			req := c.Request()
 
-			requestID := req.Header.Get("X-Request-ID")
+			requestID := c.Request().Header.Get("X-Request-ID")
 			if requestID == "" {
-				requestID = req.Header.Get("X-Correlation-ID")
+				requestID = c.Request().Header.Get("X-Correlation-ID")
 			}
 			if requestID == "" {
 				requestID = uuid.NewString()
 			}
 
-			ctx := observability.SetRequestID(req.Context(), requestID)
-			c.SetRequest(req.WithContext(ctx))
+			ctx := observability.SetRequestID(c.Request().Context(), requestID)
+			c.SetRequest(c.Request().WithContext(ctx))
+
+			req := c.Request()
 			if req.Method == http.MethodOptions &&
 				req.Header.Get(echo.HeaderOrigin) != "" &&
 				req.Header.Get(echo.HeaderAccessControlRequestMethod) != "" {
