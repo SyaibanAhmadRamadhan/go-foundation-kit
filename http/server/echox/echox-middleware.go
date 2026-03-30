@@ -112,6 +112,7 @@ func log(blacklistRouteLogResponse map[string]struct{}, sensitiveFields map[stri
 			ctx := observability.SetRequestID(c.Request().Context(), requestID)
 			c.SetRequest(c.Request().WithContext(ctx))
 
+			c.Response().Header().Set("X-Request-ID", requestID)
 			req := c.Request()
 			if req.Method == http.MethodOptions &&
 				req.Header.Get(echo.HeaderOrigin) != "" &&
@@ -225,7 +226,6 @@ func log(blacklistRouteLogResponse map[string]struct{}, sensitiveFields map[stri
 			e.Msg(fmt.Sprintf("HTTP Request: %s", key))
 			// status code yang benar
 
-			c.Response().Header().Set("X-Request-ID", requestID)
 			return err
 		}
 	}
