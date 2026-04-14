@@ -13,18 +13,11 @@ type rdbms struct {
 }
 
 type rdbmsConfig struct {
-	shardCount int
-	hashFn     func(string, byte) string
-	minCount   int64
-	janIntv    time.Duration
-	idleTTL    time.Duration
-	ctx        context.Context
-	hooks      []DBHook
+	hooks []DBHook
 }
 
-// NewRDBMS constructs an RDBMS instance on top of *sql.DB with an internal
-// prepared-statement cache and optional hooks for instrumentation.
-// The stmt cache runs a background janitor if janIntv > 0 (using cfg.ctx).
+// NewRDBMS constructs an RDBMS instance on top of *sql.DB with optional hooks
+// for instrumentation.
 func NewRDBMS(db *sql.DB, opts ...Option) *rdbms {
 	cfg := defaultConfig()
 	for _, o := range opts {
