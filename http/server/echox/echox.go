@@ -92,6 +92,10 @@ type Echox struct {
 func New(conf Config) *Echox {
 	e := echo.New()
 
+	if conf.UseOtel {
+		e.Use(otelxecho.Middleware(conf.ServiceName))
+	}
+
 	e.Use(log(conf.BlacklistRouteLogResponse, conf.SensitiveFields, conf.SkipLoggingPaths))
 	e.Use(emiddleware.Recover())
 	e.Use(emiddleware.CORSWithConfig(conf.CorsConfig))
@@ -103,10 +107,6 @@ func New(conf Config) *Echox {
 			healthPath = "/health"
 		}
 		e.GET(healthPath, createHealthCheckHandler(conf.HealthChecks))
-	}
-
-	if conf.UseOtel {
-		e.Use(otelxecho.Middleware(conf.ServiceName))
 	}
 
 	return &Echox{
