@@ -147,7 +147,7 @@ func (w *lokiHook) Write(p []byte) (n int, err error) {
 	}
 
 	for _, k := range w.streamKey {
-		if k == "deployment_environment" || k == "job" || k == "instance" || k == "level" || k == "version" {
+		if k == "deployment_environment" || k == "job" || k == "instance" || k == "level" || k == "version" || k == "service_namespace" || k == "service_name" {
 			continue
 		}
 		if v := payload[k]; v != nil {
@@ -155,7 +155,7 @@ func (w *lokiHook) Write(p []byte) (n int, err error) {
 		}
 	}
 	for k, v := range w.extraInfo {
-		if k == "deployment_environment" || k == "job" || k == "instance" || k == "level" || k == "version" {
+		if k == "deployment_environment" || k == "job" || k == "instance" || k == "level" || k == "version" || k == "service_namespace" || k == "service_name" {
 			continue
 		}
 		stream[k] = v
