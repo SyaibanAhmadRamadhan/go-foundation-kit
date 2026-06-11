@@ -65,6 +65,8 @@ func (w *KafkaHook) Write(p []byte) (n int, err error) {
 		{Key: "deployment_environment", Value: []byte(w.Env)},
 		{Key: "version", Value: []byte(w.ServiceVersion)},
 		{Key: "level", Value: fmt.Appendf(nil, "%v", level)},
+		{Key: "service_namespace", Value: []byte(w.ServiceNamespace)},
+		{Key: "service_name", Value: []byte(w.ServiceName)},
 	}
 
 	if statusCode != nil {

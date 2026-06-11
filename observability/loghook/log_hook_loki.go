@@ -142,6 +142,8 @@ func (w *lokiHook) Write(p []byte) (n int, err error) {
 		"deployment_environment": w.env,
 		"version":                w.serviceVersion,
 		"level":                  fmt.Sprintf("%v", level),
+		"service_namespace":      w.serviceNamespace,
+		"service_name":           w.serviceName,
 	}
 
 	for _, k := range w.streamKey {
