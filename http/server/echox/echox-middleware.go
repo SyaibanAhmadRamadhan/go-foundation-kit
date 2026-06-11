@@ -54,6 +54,10 @@ func (w *bodyLogWriter) Push(target string, opts *http.PushOptions) error {
 	return http.ErrNotSupported
 }
 
+func (w *bodyLogWriter) Unwrap() http.ResponseWriter {
+	return w.ResponseWriter
+}
+
 func redactSensitiveFields(data map[string]any, sensitiveFields map[string]struct{}) {
 	for key, val := range data {
 		if _, ok := sensitiveFields[key]; ok {
