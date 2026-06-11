@@ -153,7 +153,7 @@ func (t *Tracer) Before(ctx context.Context, info *sqlx.HookInfo) context.Contex
 		return ctx
 	}
 
-	opts := make([]trace.SpanStartOption, 0, 6)
+	opts := make([]trace.SpanStartOption, 0, 8)
 	opts = append(opts,
 		trace.WithSpanKind(trace.SpanKindClient),
 		trace.WithAttributes(t.tracerAttrs...),
@@ -166,10 +166,26 @@ func (t *Tracer) Before(ctx context.Context, info *sqlx.HookInfo) context.Contex
 	// Add database identity attributes for Service Graph
 	opts = append(opts, trace.WithAttributes(semconv.DBSystemKey.String(t.dbSystem)))
 	if t.dbNamespace != "" {
-		opts = append(opts, trace.WithAttributes(semconv.DBNamespace(t.dbNamespace)))
+		opts = append(opts, trace.WithAttributes(
+			semconv.DBNamespace(t.dbNamespace),
+			// Versi lama fallback
+			attribute.String("db.name", t.dbNamespace),
+			//  Kunci utama agar 'server' di Service Graph terisi nama DB Anda
+			attribute.String("peer.service", t.dbNamespace),
+		))
+	} else {
+		// Jika namespace kosong, set default nama peer.service agar tidak kosong di Grafana
+		opts = append(opts, trace.WithAttributes(
+			attribute.String("peer.service", t.dbSystem),
+		))
 	}
+
 	if t.serverAddress != "" {
-		opts = append(opts, trace.WithAttributes(semconv.ServerAddress(t.serverAddress)))
+		opts = append(opts, trace.WithAttributes(
+			semconv.ServerAddress(t.serverAddress),
+			// network peer address format lama yang sering dibaca oleh Alloy/Tempo v1.x
+			attribute.String("net.peer.name", t.serverAddress),
+		))
 	}
 
 	if t.logSQLStatement {
