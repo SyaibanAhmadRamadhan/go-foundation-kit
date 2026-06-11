@@ -6,6 +6,7 @@ import (
 	"context"
 	"net/http"
 
+	"github.com/SyaibanAhmadRamadhan/go-foundation-kit/observability/otelxhttp/otelxecho"
 	"github.com/labstack/echo/v5"
 	emiddleware "github.com/labstack/echo/v5/middleware"
 )
@@ -34,8 +35,8 @@ type Config struct {
 	// SkipLoggingPaths contains paths that should not be logged
 	// format: "METHOD:PATH"
 	SkipLoggingPaths map[string]struct{}
-	// AppName is the application name for OpenTelemetry tracing
-	AppName string
+	// ServiceName is the application name for OpenTelemetry tracing
+	ServiceName string
 	// CorsConfig is the CORS configuration for the Echo server
 	CorsConfig emiddleware.CORSConfig
 	// HealthChecks contains the list of health check functions to register
@@ -44,6 +45,8 @@ type Config struct {
 	// HealthCheckPath is the custom path for the health check endpoint
 	// Defaults to "/health" if not specified
 	HealthCheckPath string
+
+	UseOtel bool // Flag to indicate if OpenTelemetry should be used for tracing
 }
 
 // Echox is a wrapper around Echo framework with additional features.
@@ -100,6 +103,10 @@ func New(conf Config) *Echox {
 			healthPath = "/health"
 		}
 		e.GET(healthPath, createHealthCheckHandler(conf.HealthChecks))
+	}
+
+	if conf.UseOtel {
+		e.Use(otelxecho.Middleware(conf.ServiceName))
 	}
 
 	return &Echox{

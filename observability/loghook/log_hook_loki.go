@@ -30,7 +30,10 @@ type LokiHookConfig struct {
 	Password          string        // Basic Auth password
 	Endpoint          string        // Loki push endpoint
 	Env               string        // Environment name (e.g., production)
+	ServiceNamespace  string        // Optional namespace for service name
 	ServiceName       string        // Name of the service
+	ServiceInstanceID string        // Unique instance ID (e.g., pod name)
+	ServiceVersion    string        // Application version
 	OnlySink          bool          // Flag if this hook is only used as sink
 	BatchInterval     time.Duration // Time interval for flushing logs
 	BatchMessageCount int           // Max number of logs per batch
@@ -40,14 +43,17 @@ type LokiHookConfig struct {
 
 // lokiHook buffers log entries and pushes them to Loki in batches.
 type lokiHook struct {
-	username    string
-	password    string
-	endpoint    string
-	env         string
-	serviceName string
-	onlySink    bool
-	streamKey   []string
-	extraInfo   map[string]string
+	username          string
+	password          string
+	endpoint          string
+	env               string
+	serviceNamespace  string
+	serviceName       string
+	serviceInstanceID string
+	serviceVersion    string
+	onlySink          bool
+	streamKey         []string
+	extraInfo         map[string]string
 
 	batchMessageCount int
 	mu                sync.Mutex
@@ -61,13 +67,16 @@ type lokiHook struct {
 // Returns the hook and a shutdown function.
 func NewLokiHook(cfg LokiHookConfig) (*lokiHook, func()) {
 	hook := &lokiHook{
-		username:    cfg.Username,
-		password:    cfg.Password,
-		endpoint:    cfg.Endpoint,
-		env:         cfg.Env,
-		serviceName: cfg.ServiceName,
-		onlySink:    cfg.OnlySink,
-		extraInfo:   cfg.ExtraInfo,
+		username:          cfg.Username,
+		password:          cfg.Password,
+		endpoint:          cfg.Endpoint,
+		env:               cfg.Env,
+		serviceNamespace:  cfg.ServiceNamespace,
+		serviceName:       cfg.ServiceName,
+		serviceInstanceID: cfg.ServiceInstanceID,
+		serviceVersion:    cfg.ServiceVersion,
+		onlySink:          cfg.OnlySink,
+		extraInfo:         cfg.ExtraInfo,
 
 		batchMessageCount: cfg.BatchMessageCount,
 		lokiStream:        make([]LokiStream, 0, cfg.BatchMessageCount),
@@ -96,6 +105,7 @@ func NewLokiHook(cfg LokiHookConfig) (*lokiHook, func()) {
 		slog.Info("shutting down loki hook...",
 			slog.String("env", hook.env),
 			slog.String("service", hook.serviceName),
+			slog.String("namespace", hook.serviceNamespace),
 		)
 		close(hook.stopChan)
 		hook.wg.Wait()
@@ -120,14 +130,22 @@ func (w *lokiHook) Write(p []byte) (n int, err error) {
 	}
 
 	level := payload["level"]
+
+	job := w.serviceName
+	if w.serviceNamespace != "" {
+		job = fmt.Sprintf("%s/%s", w.serviceNamespace, w.serviceName)
+	}
+
 	stream := map[string]string{
-		"service": w.serviceName,
-		"env":     w.env,
-		"level":   fmt.Sprintf("%v", level),
+		"job":                    job,
+		"instance":               w.serviceInstanceID,
+		"deployment_environment": w.env,
+		"version":                w.serviceVersion,
+		"level":                  fmt.Sprintf("%v", level),
 	}
 
 	for _, k := range w.streamKey {
-		if k == "env" || k == "service" || k == "level" {
+		if k == "deployment_environment" || k == "job" || k == "instance" || k == "level" || k == "version" {
 			continue
 		}
 		if v := payload[k]; v != nil {
@@ -135,7 +153,7 @@ func (w *lokiHook) Write(p []byte) (n int, err error) {
 		}
 	}
 	for k, v := range w.extraInfo {
-		if k == "env" || k == "service" || k == "level" {
+		if k == "deployment_environment" || k == "job" || k == "instance" || k == "level" || k == "version" {
 			continue
 		}
 		stream[k] = v

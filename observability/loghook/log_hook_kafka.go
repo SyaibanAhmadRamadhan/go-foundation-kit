@@ -12,11 +12,14 @@ import (
 // KafkaHook is a custom log writer that sends log entries to a Kafka topic.
 // It can optionally print logs to the terminal in non-production environments.
 type KafkaHook struct {
-	Writer      *kafka.Writer // Kafka writer instance.
-	Topic       string        // Kafka topic where logs will be published.
-	Env         string        // Current environment (e.g., "production", "staging", "development").
-	ServiceName string        // Name of the service generating logs.
-	OnlySink    bool          // If true, logs are only sent to the sink and not printed to the terminal.
+	Writer            *kafka.Writer // Kafka writer instance.
+	Topic             string        // Kafka topic where logs will be published.
+	Env               string        // Current environment (e.g., "production", "staging", "development").
+	ServiceNamespace  string        // Optional namespace for service name.
+	ServiceName       string        // Name of the service generating logs.
+	ServiceInstanceID string        // Unique instance ID (e.g., pod name).
+	ServiceVersion    string        // Application version.
+	OnlySink          bool          // If true, logs are only sent to the sink and not printed to the terminal.
 }
 
 // Write implements the io.Writer interface for KafkaHook.
@@ -28,7 +31,10 @@ func (w *KafkaHook) Write(p []byte) (n int, err error) {
 	if w.Env != "production" && !w.OnlySink {
 		slog.Info("log output (non-production)",
 			slog.String("service", w.ServiceName),
+			slog.String("namespace", w.ServiceNamespace),
+			slog.String("instance", w.ServiceInstanceID),
 			slog.String("env", w.Env),
+			slog.String("version", w.ServiceVersion),
 			slog.String("log", string(p)),
 		)
 	}
@@ -47,9 +53,17 @@ func (w *KafkaHook) Write(p []byte) (n int, err error) {
 	statusCode := payload["status_code"]
 	spanID := payload["span_id"]
 	traceID := payload["trace_id"]
+
+	job := w.ServiceName
+	if w.ServiceNamespace != "" {
+		job = fmt.Sprintf("%s/%s", w.ServiceNamespace, w.ServiceName)
+	}
+
 	headers := []kafka.Header{
-		{Key: "service_name", Value: []byte(w.ServiceName)},
-		{Key: "env", Value: []byte(w.Env)},
+		{Key: "job", Value: []byte(job)},
+		{Key: "instance", Value: []byte(w.ServiceInstanceID)},
+		{Key: "deployment_environment", Value: []byte(w.Env)},
+		{Key: "version", Value: []byte(w.ServiceVersion)},
 		{Key: "level", Value: fmt.Appendf(nil, "%v", level)},
 	}
 

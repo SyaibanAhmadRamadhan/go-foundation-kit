@@ -16,7 +16,9 @@ import (
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 )
 
-// traceBuilder provides a fluent interface for constructing a TracerProvider.
+// traceBuilder provides a fluent interface for constructing an OpenTelemetry TracerProvider.
+// Its objective is to simplify the complex setup of tracing components like exporters, resources,
+// samplers, and processors through a chainable API.
 type traceBuilder struct {
 	exporter      *otlptrace.Exporter
 	resource      *resource.Resource
@@ -31,17 +33,22 @@ type traceBuilder struct {
 }
 
 // NewTrace returns a new instance of traceBuilder.
+// The objective is to provide a clean entry point for configuring OpenTelemetry tracing.
 func NewTrace() *traceBuilder {
 	return &traceBuilder{}
 }
 
 // WithExporter sets the OTLP trace exporter.
+// The objective is to allow the user to provide a custom-configured OTLP exporter
+// for sending trace data to a backend (e.g., Jaeger, Tempo, or OpenTelemetry Collector).
 func (b *traceBuilder) WithExporter(exp *otlptrace.Exporter) *traceBuilder {
 	b.exporter = exp
 	return b
 }
 
 // WithExporterGrpcBasicAuth initializes and sets an OTLP trace exporter over gRPC with basic auth.
+// The objective is to provide a convenient way to connect to OTLP collectors that require
+// Basic Authentication, handling the encoding and header setup automatically.
 // You can pass additional otlptracegrpc.Option (e.g., WithTLS, WithCompressor, etc.).
 // If an error occurs, it will be stored in the builder and returned during Init().
 func (b *traceBuilder) WithExporterGrpcBasicAuth(ctx context.Context, username, password, endpoint string, opts ...otlptracegrpc.Option) *traceBuilder {
@@ -71,55 +78,80 @@ func (b *traceBuilder) WithExporterGrpcBasicAuth(ctx context.Context, username, 
 }
 
 // WithResource sets the OpenTelemetry resource.
+// The objective is to define the identity of the service being traced (e.g., name, version, environment).
+// If not provided, a default resource with the given service name will be used.
 func (b *traceBuilder) WithResource(res *resource.Resource) *traceBuilder {
 	b.resource = res
 	return b
 }
 
 // WithSampler sets a custom sampler.
+// The objective is to control the volume of traces being collected and exported,
+// which is important for managing performance and storage costs.
+// Defaults to AlwaysSample if not specified.
 func (b *traceBuilder) WithSampler(sampler sdktrace.Sampler) *traceBuilder {
 	b.sampler = sampler
 	return b
 }
 
+// WithPropagator sets the text map propagator for context injection and extraction.
+// The objective is to enable distributed tracing by allowing the trace context to travel
+// across service boundaries (e.g., via HTTP headers).
 func (b *traceBuilder) WithPropagator(p propagation.TextMapPropagator) *traceBuilder {
 	b.propagator = p
 	return b
 }
 
+// WithSpanLimits sets the limits for spans (e.g., max attributes, max events).
+// The objective is to prevent excessive resource consumption by individual spans
+// that might have a large number of attributes or events.
 func (b *traceBuilder) WithSpanLimits(sl sdktrace.SpanLimits) *traceBuilder {
 	b.spanLimit = sl
 	return b
 }
 
+// WithPropagators sets multiple propagators as a composite propagator.
+// The objective is to support multiple propagation formats (e.g., W3C TraceContext and Baggage)
+// in a single configuration.
 func (b *traceBuilder) WithPropagators(ps ...propagation.TextMapPropagator) *traceBuilder {
 	b.propagator = propagation.NewCompositeTextMapPropagator(ps...)
 	return b
 }
 
 // WithIDGenerator sets a custom trace ID generator.
+// The objective is to allow the use of specific ID generation logic if required
+// by the tracing backend or organizational standards.
 func (b *traceBuilder) WithIDGenerator(idGen sdktrace.IDGenerator) *traceBuilder {
 	b.idGenerator = idGen
 	return b
 }
 
 // WithSpanProcessor sets a custom span processor.
+// The objective is to provide fine-grained control over how spans are processed
+// (e.g., using a SimpleSpanProcessor for testing or a BatchSpanProcessor for production).
 func (b *traceBuilder) WithSpanProcessor(sp sdktrace.SpanProcessor) *traceBuilder {
 	b.spanProcessor = sp
 	return b
 }
 
+// Exporter returns the currently configured OTLP trace exporter.
+// The objective is to allow access to the exporter instance for inspection or further configuration.
 func (b *traceBuilder) Exporter() *otlptrace.Exporter {
 	return b.exporter
 }
 
+// WithGlobalTraceProvider flags that the configured TracerProvider should be set globally.
+// The objective is to simplify usage by allowing the application to use otel.GetTracerProvider()
+// and other global OpenTelemetry helpers.
 func (b *traceBuilder) WithGlobalTraceProvider() *traceBuilder {
 	b.setGlobalTp = true
 	return b
 }
 
 // Init constructs the TracerProvider based on the builder configuration.
-// It sets the global TracerProvider if WithSetGlobal was called.
+// Its objective is to finalize the setup, register the global provider if requested,
+// and return a shutdown function for graceful cleanup.
+// It sets the global TracerProvider if WithGlobalTraceProvider was called.
 // Returns a shutdown function and any error that occurred during initialization.
 func (b *traceBuilder) Init(ctx context.Context, serviceName string) (func(), error) {
 	if b.initErr != nil {
@@ -145,7 +177,7 @@ func (b *traceBuilder) Init(ctx context.Context, serviceName string) (func(), er
 	if b.resource != nil {
 		opts = append(opts, sdktrace.WithResource(b.resource))
 	} else {
-		res, err := NewOpenTelemetryStdResource(ctx, serviceName)
+		res, err := NewOpenTelemetryBasicResource(ctx, serviceName)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create default OpenTelemetry resource: %w", err)
 		}
