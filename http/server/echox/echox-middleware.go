@@ -196,7 +196,7 @@ func log(blacklistRouteLogResponse map[string]struct{}, sensitiveFields map[stri
 				level = zerolog.WarnLevel
 			}
 
-			e := observability.Start(req.Context(), level).
+			e := observability.Start(c.Request().Context(), level).
 				Str("method", method).
 				Str("path", path).
 				Int("status_code", status).
