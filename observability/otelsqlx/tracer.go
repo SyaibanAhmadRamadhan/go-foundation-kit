@@ -13,7 +13,7 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/metric"
-	semconv "go.opentelemetry.io/otel/semconv/v1.26.0"
+	semconv "go.opentelemetry.io/otel/semconv/v1.27.0"
 	"go.opentelemetry.io/otel/trace"
 )
 
@@ -32,13 +32,13 @@ const (
 	SqlxInTx        = attribute.Key("sqlx.in_tx")
 	SqlxUsePrepared = attribute.Key("sqlx.use_prepared")
 
-	// OperationTypeKey represents the pgx tracer operation type
+	// OperationTypeKey represents the sqlx tracer operation type
 	OperationTypeKey = attribute.Key("sqlx.operation.type")
 	// DBClientOperationErrorsKey represents the count of operation errors
 	DBClientOperationErrorsKey = attribute.Key("db.client.operation.errors")
 )
 
-// Tracer is a wrapper around the pgx tracer interfaces which instrument
+// Tracer is a wrapper around the sqlx hook interfaces which instrument
 // queries with both tracing and metrics.
 type Tracer struct {
 	tracer      trace.Tracer

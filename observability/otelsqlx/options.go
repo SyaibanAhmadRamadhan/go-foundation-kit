@@ -1,10 +1,17 @@
 package otelsqlx
 
 import (
+	"github.com/SyaibanAhmadRamadhan/go-foundation-kit/databases/sqlx"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/metric"
 	"go.opentelemetry.io/otel/trace"
 )
+
+// UseOtel returns a sqlx.Option that attaches an OpenTelemetry tracer hook to the RDBMS.
+// Its objective is to simplify the integration between sqlx and OpenTelemetry tracing/metrics.
+func UseOtel(opts ...Option) sqlx.Option {
+	return sqlx.UseHook(NewTracer(opts...))
+}
 
 // Option specifies instrumentation configuration options.
 type Option interface {
@@ -99,7 +106,7 @@ func WithDisableSQLStatementInAttributes() Option {
 	})
 }
 
-// WithIncludeQueryParameters includes the SQL query parameters in the span attribute with key pgx.query.parameters.
+// WithIncludeQueryParameters includes the SQL query parameters in the span attribute with key sqlx.query.parameters.
 // This is implicitly disabled if WithDisableSQLStatementInAttributes is used.
 func WithIncludeQueryParameters() Option {
 	return optionFunc(func(cfg *tracerConfig) {
