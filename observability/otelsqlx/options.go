@@ -113,3 +113,27 @@ func WithIncludeQueryParameters() Option {
 		cfg.includeParams = true
 	})
 }
+
+// WithDBSystem sets the database system (e.g., postgresql, mysql).
+// Its objective is to help Grafana Service Graph identify the type of database.
+func WithDBSystem(system string) Option {
+	return optionFunc(func(cfg *tracerConfig) {
+		cfg.dbSystem = system
+	})
+}
+
+// WithDBNamespace sets the database name.
+// Its objective is to help Grafana Service Graph identify the specific database being accessed.
+func WithDBNamespace(ns string) Option {
+	return optionFunc(func(cfg *tracerConfig) {
+		cfg.dbNamespace = ns
+	})
+}
+
+// WithServerAddress sets the database server address (host:port).
+// Its objective is to help Grafana Service Graph visualize the connection target.
+func WithServerAddress(addr string) Option {
+	return optionFunc(func(cfg *tracerConfig) {
+		cfg.serverAddress = addr
+	})
+}

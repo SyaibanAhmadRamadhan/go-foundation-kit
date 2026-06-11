@@ -49,6 +49,9 @@ type Tracer struct {
 	operationDuration metric.Int64Histogram
 	operationErrors   metric.Int64Counter
 
+	dbSystem            string
+	dbNamespace         string
+	serverAddress       string
 	trimQuerySpanName   bool
 	spanNameFunc        SpanNameFunc
 	prefixQuerySpanName bool
@@ -63,6 +66,9 @@ type tracerConfig struct {
 	tracerAttrs []attribute.KeyValue
 	meterAttrs  []attribute.KeyValue
 
+	dbSystem            string
+	dbNamespace         string
+	serverAddress       string
 	trimQuerySpanName   bool
 	spanNameFunc        SpanNameFunc
 	prefixQuerySpanName bool
@@ -77,6 +83,7 @@ func NewTracer(opts ...Option) *Tracer {
 		meterProvider:       otel.GetMeterProvider(),
 		tracerAttrs:         []attribute.KeyValue{},
 		meterAttrs:          []attribute.KeyValue{},
+		dbSystem:            "postgresql", // Default to postgres
 		trimQuerySpanName:   false,
 		spanNameFunc:        nil,
 		prefixQuerySpanName: true,
@@ -93,11 +100,23 @@ func NewTracer(opts ...Option) *Tracer {
 		meter:               cfg.meterProvider.Meter(meterName, metric.WithInstrumentationVersion(findOwnImportedVersion())),
 		tracerAttrs:         cfg.tracerAttrs,
 		meterAttrs:          cfg.meterAttrs,
+		dbSystem:            cfg.dbSystem,
+		dbNamespace:         cfg.dbNamespace,
+		serverAddress:       cfg.serverAddress,
 		trimQuerySpanName:   cfg.trimQuerySpanName,
 		spanNameFunc:        cfg.spanNameFunc,
 		prefixQuerySpanName: cfg.prefixQuerySpanName,
 		logSQLStatement:     cfg.logSQLStatement,
 		includeParams:       cfg.includeParams,
+	}
+
+	// Add database identity to metrics by default
+	tracer.meterAttrs = append(tracer.meterAttrs, semconv.DBSystemKey.String(tracer.dbSystem))
+	if tracer.dbNamespace != "" {
+		tracer.meterAttrs = append(tracer.meterAttrs, semconv.DBNamespace(tracer.dbNamespace))
+	}
+	if tracer.serverAddress != "" {
+		tracer.meterAttrs = append(tracer.meterAttrs, semconv.ServerAddress(tracer.serverAddress))
 	}
 
 	tracer.createMetrics()
@@ -143,6 +162,15 @@ func (t *Tracer) Before(ctx context.Context, info *sqlx.HookInfo) context.Contex
 			SqlxUsePrepared.Bool(info.Prepared),
 		),
 	)
+
+	// Add database identity attributes for Service Graph
+	opts = append(opts, trace.WithAttributes(semconv.DBSystemKey.String(t.dbSystem)))
+	if t.dbNamespace != "" {
+		opts = append(opts, trace.WithAttributes(semconv.DBNamespace(t.dbNamespace)))
+	}
+	if t.serverAddress != "" {
+		opts = append(opts, trace.WithAttributes(semconv.ServerAddress(t.serverAddress)))
+	}
 
 	if t.logSQLStatement {
 		opts = append(opts, trace.WithAttributes(
