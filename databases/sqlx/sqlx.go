@@ -157,51 +157,67 @@ func (r *rdbms) DoTxContext(ctx context.Context, opt *sql.TxOptions, fn func(ctx
 		ctx = context.Background()
 	}
 
-	// Already inside a transaction: run on the same receiver (nested logical tx, single physical tx).
 	if r.tx != nil {
 		return fn(ctx, r)
 	}
 
-	// Begin
-	txHook := &HookInfo{
-		Op:    OpTxBegin,
-		Start: time.Now(),
-	}
-	ctx = r.callBefore(ctx, txHook)
-	tx, err := r.db.BeginTx(ctx, opt)
+	wrapperHook := &HookInfo{Op: "TX_WRAPPER", Start: time.Now()}
+	ctx = r.callBefore(ctx, wrapperHook)
+	defer func() {
+		wrapperHook.End = time.Now()
+		wrapperHook.Err = err
+		r.callAfter(ctx, wrapperHook)
+	}()
+
+	beginHook := &HookInfo{Op: OpTxBegin, Start: time.Now()}
+	ctxBegin := r.callBefore(ctx, beginHook)
+
+	tx, err := r.db.BeginTx(ctxBegin, opt)
+	beginHook.Err, beginHook.End = err, time.Now()
+	r.callAfter(ctxBegin, beginHook)
+
 	if err != nil {
-		txHook.Err, txHook.End = err, time.Now()
-		r.callAfter(ctx, txHook)
 		return err
 	}
 
-	// Child context bound to this tx
 	child := &rdbms{db: r.db, tx: tx, hooks: r.hooks}
 
 	defer func() {
 		if p := recover(); p != nil {
+			rollHook := &HookInfo{Op: OpTxRollback, Start: time.Now()}
+			ctxRoll := r.callBefore(ctx, rollHook)
+
 			_ = tx.Rollback()
-			txHook.Op = OpTxRollback
-			txHook.Err = fmt.Errorf("panic: %v", p)
-			r.callAfter(ctx, txHook)
+
+			rollHook.Err = fmt.Errorf("panic: %v", p)
+			rollHook.End = time.Now()
+			r.callAfter(ctxRoll, rollHook)
 			panic(p)
 		}
+
 		if err != nil {
+			rollHook := &HookInfo{Op: OpTxRollback, Start: time.Now()}
+			ctxRoll := r.callBefore(ctx, rollHook)
+
 			_ = tx.Rollback()
-			txHook.Op = OpTxRollback
-			txHook.Err = err
-			r.callAfter(ctx, txHook)
+
+			rollHook.Err = err
+			rollHook.End = time.Now()
+			r.callAfter(ctxRoll, rollHook)
 			return
 		}
+
+		commitHook := &HookInfo{Op: OpTxCommit, Start: time.Now()}
+		ctxCommit := r.callBefore(ctx, commitHook)
+
 		cerr := tx.Commit()
+
+		commitHook.Err, commitHook.End = cerr, time.Now()
+		r.callAfter(ctxCommit, commitHook)
+
 		if cerr != nil {
 			err = cerr
-			txHook.Op = OpTxRollback
-			txHook.Err = cerr
-		} else {
-			txHook.Op = OpTxCommit
 		}
-		r.callAfter(ctx, txHook)
 	}()
 
 	return fn(ctx, child)
