@@ -3,6 +3,7 @@ package sqlx
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"time"
 )
 
@@ -162,15 +163,15 @@ func (r *rdbms) DoTxContext(ctx context.Context, opt *sql.TxOptions, fn func(ctx
 	}
 
 	// Begin
-	beg := &HookInfo{
+	txHook := &HookInfo{
 		Op:    OpTxBegin,
 		Start: time.Now(),
 	}
-	ctx = r.callBefore(ctx, beg)
+	ctx = r.callBefore(ctx, txHook)
 	tx, err := r.db.BeginTx(ctx, opt)
-	beg.Err, beg.End = err, time.Now()
-	r.callAfter(ctx, beg)
 	if err != nil {
+		txHook.Err, txHook.End = err, time.Now()
+		r.callAfter(ctx, txHook)
 		return err
 	}
 
@@ -180,20 +181,27 @@ func (r *rdbms) DoTxContext(ctx context.Context, opt *sql.TxOptions, fn func(ctx
 	defer func() {
 		if p := recover(); p != nil {
 			_ = tx.Rollback()
-			roll := &HookInfo{Op: OpTxRollback, Err: err, Start: time.Now(), End: time.Now()}
-			r.callAfter(ctx, roll)
+			txHook.Op = OpTxRollback
+			txHook.Err = fmt.Errorf("panic: %v", p)
+			r.callAfter(ctx, txHook)
 			panic(p)
 		}
 		if err != nil {
 			_ = tx.Rollback()
-			roll := &HookInfo{Op: OpTxRollback, Err: err, Start: time.Now(), End: time.Now()}
-			r.callAfter(ctx, roll)
+			txHook.Op = OpTxRollback
+			txHook.Err = err
+			r.callAfter(ctx, txHook)
 			return
 		}
-		cm := &HookInfo{Op: OpTxCommit, Start: time.Now()}
 		cerr := tx.Commit()
-		cm.Err, cm.End = cerr, time.Now()
-		r.callAfter(ctx, cm)
+		if cerr != nil {
+			err = cerr
+			txHook.Op = OpTxRollback
+			txHook.Err = cerr
+		} else {
+			txHook.Op = OpTxCommit
+		}
+		r.callAfter(ctx, txHook)
 	}()
 
 	return fn(ctx, child)
