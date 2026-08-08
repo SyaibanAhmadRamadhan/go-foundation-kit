@@ -2,42 +2,187 @@ package graceful
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"log/slog"
 	"os"
 	"os/signal"
+	"sync"
 	"syscall"
 	"time"
 )
 
-func Shutdown(fn func(ctx context.Context) error, timeout time.Duration, osSignals ...os.Signal) {
-	quit := make(chan os.Signal, 1)
+type CloseFunc func(context.Context) error
 
-	if len(osSignals) == 0 {
-		osSignals = append(osSignals, syscall.SIGINT, syscall.SIGTERM)
+type closeResource struct {
+	name string
+	fn   CloseFunc
+}
+
+type config struct {
+	timeout time.Duration
+	signals []os.Signal
+}
+
+type Option func(*config)
+
+var (
+	mu sync.Mutex
+
+	cfg = config{
+		timeout: 30 * time.Second,
+		signals: []os.Signal{
+			syscall.SIGINT,
+			syscall.SIGTERM,
+		},
 	}
-	signal.Notify(quit, osSignals...)
 
-	sig := <-quit
-	slog.Info("Received OS signal, starting graceful shutdown", "signal", sig.String())
+	resources []closeResource
 
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
+	listenerOnce sync.Once
+	shutdownOnce sync.Once
 
-	if err := fn(ctx); err != nil {
-		slog.Error("Graceful shutdown failed", "error", err)
-	} else {
-		slog.Info("Graceful shutdown completed successfully")
+	started bool
+)
+
+func Configure(options ...Option) error {
+	mu.Lock()
+	defer mu.Unlock()
+
+	if started {
+		return errors.New("graceful: already started")
+	}
+
+	for _, option := range options {
+		option(&cfg)
+	}
+
+	return nil
+}
+
+func WithTimeout(timeout time.Duration) Option {
+	return func(cfg *config) {
+		cfg.timeout = timeout
 	}
 }
 
-func TriggerShutdown() {
-	p, err := os.FindProcess(os.Getpid())
-	if err != nil {
-		slog.Error("Failed to find process", "error", err)
-		return
+func WithSignals(signals ...os.Signal) Option {
+	return func(cfg *config) {
+		cfg.signals = append([]os.Signal(nil), signals...)
+	}
+}
+
+func RegisterCloseResource(
+	name string,
+	fn CloseFunc,
+) {
+	mu.Lock()
+
+	resources = append(resources, closeResource{
+		name: name,
+		fn:   fn,
+	})
+
+	mu.Unlock()
+
+	startListener()
+}
+
+func startListener() {
+	listenerOnce.Do(func() {
+		mu.Lock()
+
+		started = true
+
+		timeout := cfg.timeout
+		signals := append([]os.Signal(nil), cfg.signals...)
+
+		mu.Unlock()
+
+		ctx, stop := signal.NotifyContext(
+			context.Background(),
+			signals...,
+		)
+
+		go func() {
+			defer stop()
+
+			<-ctx.Done()
+
+			slog.Info(
+				"Received OS signal, starting graceful shutdown",
+			)
+
+			shutdown(timeout)
+		}()
+	})
+}
+
+func shutdown(timeout time.Duration) {
+	shutdownOnce.Do(func() {
+		ctx, cancel := context.WithTimeout(
+			context.Background(),
+			timeout,
+		)
+		defer cancel()
+
+		if err := closeAll(ctx); err != nil {
+			slog.Error(
+				"Graceful shutdown completed with errors",
+				"error", err,
+			)
+			return
+		}
+
+		slog.Info(
+			"Graceful shutdown completed successfully",
+		)
+	})
+}
+
+func closeAll(ctx context.Context) error {
+	mu.Lock()
+	items := append([]closeResource(nil), resources...)
+	mu.Unlock()
+
+	var errs []error
+
+	for i := len(items) - 1; i >= 0; i-- {
+		resource := items[i]
+
+		slog.Info(
+			"Closing resource",
+			"resource", resource.name,
+		)
+
+		if err := resource.fn(ctx); err != nil {
+			errs = append(
+				errs,
+				fmt.Errorf("%s: %w", resource.name, err),
+			)
+
+			slog.Error(
+				"Failed to close resource",
+				"resource", resource.name,
+				"error", err,
+			)
+
+			continue
+		}
+
+		slog.Info(
+			"Resource closed successfully",
+			"resource", resource.name,
+		)
 	}
 
-	if err := p.Signal(syscall.SIGINT); err != nil {
-		slog.Error("Failed to send shutdown signal", "error", err)
-	}
+	return errors.Join(errs...)
+}
+
+func TriggerShutdown() {
+	mu.Lock()
+	timeout := cfg.timeout
+	mu.Unlock()
+
+	shutdown(timeout)
 }
