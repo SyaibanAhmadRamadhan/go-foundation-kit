@@ -99,6 +99,7 @@ func (l *Loader[T]) ReloadAndGet() (*T, error) {
 
 func (l *Loader[T]) Close() {
 	l.cancel()
+	closeSubscribetionNotify()
 }
 
 func (l *Loader[T]) startIntervalRefresh() {

@@ -177,7 +177,7 @@ func createHealthCheckHandler(checks []HealthCheckItem) echo.HandlerFunc {
 			statusCode = http.StatusServiceUnavailable
 		}
 
-		return c.JSON(statusCode, map[string]interface{}{
+		return c.JSON(statusCode, map[string]any{
 			"status": overallStatus,
 			"checks": results,
 		})

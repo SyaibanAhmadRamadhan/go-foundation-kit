@@ -62,7 +62,7 @@ func Notify() {
 // Close shuts down all subscribers at once.
 // It closes every channel and clears the registry.
 // After calling Close, no new notifications should be sent.
-func Close() {
+func closeSubscribetionNotify() {
 	mu.Lock()
 	defer mu.Unlock()
 
