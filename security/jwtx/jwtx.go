@@ -137,7 +137,6 @@ func (j *JWT) GenerateToken(data EzClaims) (string, error) {
 		return "", err
 	}
 
-	// Skip enkripsi jika encrypted=false
 	return signed, nil
 }
 
@@ -201,4 +200,44 @@ func (j *JWT) GetTokenData(token string) (*EzClaims, error) {
 		return nil, ErrInvalidToken
 	}
 	return claims, nil
+}
+
+func (j *JWT) CreateWithCustomClaims(claims jwt.Claims) (string, error) {
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	signed, err := j.signer.Sign(token)
+	if err != nil {
+		return "", err
+	}
+
+	return signed, nil
+}
+
+func (j *JWT) ValidateWithCustomClaims(tokenString string, claims jwt.Claims) (*jwt.Token, error) {
+	if tokenString == "" {
+		return nil, ErrEmptyToken
+	}
+
+	tok, err := jwt.ParseWithClaims(tokenString, claims, func(t *jwt.Token) (any, error) {
+		if t.Method.Alg() != j.signer.Method().Alg() {
+			return nil, fmt.Errorf("%w: unexpected alg %s", ErrInvalidToken, t.Method.Alg())
+		}
+		return j.signer.VerifyKey(t)
+	})
+
+	if err == nil {
+		return tok, nil
+	}
+
+	switch {
+	case errors.Is(err, jwt.ErrTokenMalformed):
+		return nil, ErrInvalidToken
+	case errors.Is(err, jwt.ErrTokenExpired), errors.Is(err, jwt.ErrTokenNotValidYet):
+		return nil, ErrExpiredToken
+	default:
+		return nil, ErrInvalidToken
+	}
+}
+
+func (j *JWT) Issuer() string {
+	return j.issuer
 }
