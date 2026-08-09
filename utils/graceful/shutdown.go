@@ -186,3 +186,13 @@ func TriggerShutdown() {
 
 	shutdown(timeout)
 }
+
+func TriggerShutdownAndExit() {
+	mu.Lock()
+	timeout := cfg.timeout
+	mu.Unlock()
+
+	shutdown(timeout)
+
+	os.Exit(0)
+}
