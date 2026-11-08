@@ -373,6 +373,73 @@ func (h *EchoxHelper) QueryParamsToRangeDatePtr(key string, layout string, c *ec
 	return start, end, nil
 }
 
+// QueryParamsToCalendarDateRangePtr parses one or two calendar dates using loc.
+//
+// Accepted formats:
+//   - YYYY-MM-DD
+//   - YYYY-MM-DD,YYYY-MM-DD
+//
+// A single date covers the entire calendar day.
+// The supplied end date is inclusive.
+//
+// Results are returned in UTC for filtering with:
+//
+//	timestamp >= start AND timestamp < before
+//
+// Empty input returns nil bounds.
+func (h *EchoxHelper) QueryParamsToCalendarDateRangePtr(
+	key string,
+	loc *time.Location,
+	c *echo.Context,
+) (start, before *time.Time, err error) {
+	q := strings.TrimSpace(c.QueryParam(key))
+	if q == "" {
+		return nil, nil, nil
+	}
+	if loc == nil {
+		return nil, nil, errors.New("date range location is required")
+	}
+
+	parts := strings.Split(q, ",")
+	if len(parts) > 2 {
+		return nil, nil, errors.New(
+			key + " must be YYYY-MM-DD or YYYY-MM-DD,YYYY-MM-DD",
+		)
+	}
+
+	startDate, err := time.ParseInLocation(
+		time.DateOnly,
+		strings.TrimSpace(parts[0]),
+		loc,
+	)
+	if err != nil {
+		return nil, nil, errors.New("invalid " + key + " start date")
+	}
+
+	endDate := startDate
+	if len(parts) == 2 {
+		endDate, err = time.ParseInLocation(
+			time.DateOnly,
+			strings.TrimSpace(parts[1]),
+			loc,
+		)
+		if err != nil {
+			return nil, nil, errors.New("invalid " + key + " end date")
+		}
+	}
+
+	if endDate.Before(startDate) {
+		return nil, nil, errors.New(
+			key + " end date must not be before start date",
+		)
+	}
+
+	startUTC := startDate.UTC()
+	beforeUTC := endDate.AddDate(0, 0, 1).UTC()
+
+	return &startUTC, &beforeUTC, nil
+}
+
 // QueryParamsToBooleanPtr parses a boolean query parameter into a bool pointer.
 // This is useful for distinguishing between "false" and "not provided" in optional filters.
 //
